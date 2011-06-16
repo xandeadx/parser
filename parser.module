@@ -1,0 +1,619 @@
+<?php
+
+/**
+ * Implements hook_menu()
+ */
+function parser_menu() {
+  /*$items['admin/config/services/parser'] = array(
+    'title' => 'Site parser',
+    'description' => 'Parse html pages to nodes',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('parser_start_form'),
+    'access arguments' => array('administer node'),
+  );
+  return $items;*/
+}
+
+/**
+ * Implements hook_entity_info()
+ */
+function parser_entity_info() {
+  return array(
+    'parser_job' => array(
+      'label' => t('Job parsing'),
+      'entity class' => 'Entity',
+      'controller class' => 'EntityAPIController',
+      'base table' => 'parser_jobs',
+      'entity keys' => array(
+        'id' => 'id',
+        'label' => 'title'
+      ),
+      'admin ui' => array(
+        'path' => 'admin/structure/parser_jobs'
+      ),
+      'access callback' => 'parser_job_access',
+      'module' => 'parser',
+    ),
+  );
+}
+
+/**
+ * Check acces rights
+ */
+function parser_job_access($op, $entity, $account = NULL, $entity_type = 'parser_job') {
+  return user_access('administer nodes');
+}
+ 
+/**
+ * Load entity object by id
+ */
+function parser_job_load($id) {
+  $result = entity_load('parser_job', array($id));
+  return $result ? reset($result) : FALSE;
+}
+
+/**
+ * Menu callback
+ */
+function parser_job_form($form, &$form_state, $job) {
+  $form['title'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Название задания',
+    '#description' => 'Будет отображаться в списке с заданиями. Пример заполнения: <code>Парсинг проектов на drupal.org</code>',
+    '#required' => TRUE,
+    '#default_value' => isset($job->title) ? $job->title : '',
+  );
+  
+  $form['start_url'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Стартовый адрес',
+    '#description' => 'Адрес, с которого парсер начнёт работу. Пример заполнения: <code>http://drupal.org/project/modules</code>',
+    '#required' => TRUE,
+    '#default_value' => isset($job->start_url) ? $job->start_url : '',
+  );
+  
+  $form['depth'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Глубина',
+    '#description' => 'Глубина, на которую парсер будет ходить по ссылкам. Например 1 означает, что будет обработан стартовый адрес и ссылки найденные на нём.',
+    '#required' => TRUE,
+    '#default_value' => isset($job->depth) ? $job->depth : 1,
+    '#size' => 5,
+  );
+  
+  $form['node_limit'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Ограничить число нод',
+    '#description' => 'Введите максимальное чилос нод, которое сможет создать парсер. Укажите 0 если ограничения не нужны.',
+    '#required' => TRUE,
+    '#default_value' => isset($job->node_limit) ? $job->node_limit : 1,
+    '#size' => 5,
+  );
+  
+  $form['white_list'] = array(
+    '#type' => 'textarea',
+    '#title' => 'Белый список адресов',
+    '#description' => 'Маски адресов, по которым будет разрешено ходить парсеру. Каждая маска на новой строке. Оставьте пустым, если парсеру разрешено ходить по всем найденным ссылкам. Пример заполнения: <code>http://drupal.org/project/*</code>',
+    '#default_value' => isset($job->white_list) ? $job->white_list : '',
+    '#rows' => 3,
+  );
+
+  $form['black_list'] = array(
+    '#type' => 'textarea',
+    '#title' => 'Чёрный список адресов',
+    '#description' => 'Маски адресов, по которым будет запрещено ходить парсеру. Каждая маска на новой строке. Пример заполнения: <code>http://drupal.org/project/uc_*</code>',
+    '#default_value' => isset($job->black_list) ? $job->black_list : '',
+    '#rows' => 3,
+  );
+  
+  $form['check_code'] = array(
+    '#type' => 'textarea',
+    '#title' => 'Код проверки для дальнейшего парсинга страницы',
+    '#description' => 'PHP код без тегов &lt;?php и ?&gt;, который должен вернуть TRUE если эту страницу нужно парсить в ноду. Доступные переменные: $page - html код страницы, $doc - объект phpQuery. Пример заполнения: <code>if ($doc->find(\'a[href="/project/themes"].active\')->length() && $doc->find(\'.view-project-release-download-table\')->length()) return TRUE;</code>',
+    '#default_value' => isset($job->check_code) ? $job->check_code : '',
+    '#rows' => 3,
+  );
+  
+  $node_types = node_type_get_names();
+  
+  $form['node_type'] = array(
+    '#type' => 'select',
+    '#title' => 'Тип материала',
+    '#description' => 'Выберите тип материала, который будет создавать парсер.',
+    '#options' => $node_types,
+    '#default_value' => isset($job->node_type) ? $job->node_type : key($node_types),
+    '#required' => TRUE,
+    '#ajax' => array(
+      'callback' => 'parser_job_form_fields',
+      'wrapper' => 'node-fields-code',
+    ),
+  );
+  
+  $form['fields'] = array(
+    '#type' => 'fieldset',
+    '#title' => 'Поля',
+    '#description' => 'Поля заполняются без обёртки кода в &lt;?php и ?&gt;. Во всех полях доступны две переменные $page - html код страницы, $doc - объект phpQuery.',
+  );
+  
+  $form['fields']['node_title_code'] = array(
+    '#type' => 'textarea',
+    '#title' => 'title',
+    '#description' => 'PHP код, который должен вернуть заголовок ноды. Пример заполнения: <code>return $doc->find(\'h1#page-subtitle\')->text();</code>',
+    '#default_value' => isset($job->node_title_code) ? $job->node_title_code : '',
+    '#required' => TRUE,
+    '#rows' => 3,
+  );
+  
+  $form['fields']['node_fields_code'] = array(
+    '#prefix' => '<div id="node-fields-code">',
+    '#suffix' => '</div>',
+    '#tree' => TRUE,
+  );
+  
+  $node_type = $form['node_type']['#default_value'];
+  if (isset($form_state['values']['node_type'])) {
+    $node_type = $form_state['values']['node_type'];
+  }
+  $fields = field_info_fields();
+  $instances = field_info_instances();
+  $node_fields_code = isset($job->node_fields_code) ? unserialize($job->node_fields_code) : array();
+  $formats = filter_formats();
+  $format_options = array();
+  foreach ($formats as $format) {
+    $format_options[$format->format] = $format->name;
+  }
+  $descriptions = array(
+    'default' => 'PHP код, который должен вернуть значение поля.',
+    'image' => 'PHP код, который должен вернуть URL картинки. Адрес может быть как абсолютный, так и относительный. Все картинки будут закачаны на текущий сервер, в директорию указанную в настройках поля.',
+    'taxonomy_term_reference' => 'PHP код, который должен вернуть название термина, либо массив названий. Отсутствующие термины будут созданы автоматически.',
+  );
+  
+  foreach ($fields as $field_name => $field) {
+    if (isset($field['bundles']['node']) && in_array($node_type, $field['bundles']['node'])) {
+      $description = isset($descriptions[$field['type']]) ? $descriptions[$field['type']] : $descriptions['default'];
+      $description .= !function_exists('_parser_add_field_' . $field['type']) ? ' <span style="color:red;">Тип поля не поддерживается, это значит что код должен возвращать всю структуру поля.</span>' : '';
+        
+      $form['fields']['node_fields_code'][$field_name] = array(
+        '#type' => 'textarea',
+        '#title' => $field_name,
+        '#description' => $description,
+        '#default_value' => isset($node_fields_code[$field_name]) ? $node_fields_code[$field_name] : '',
+        '#rows' => 3,
+      );
+
+      if (!empty($instances['node'][$node_type][$field_name]['settings']['text_processing'])) {
+        $form['fields']['node_fields_code'][$field_name . '_format'] = array(
+          '#type' => 'select',
+          '#title' => $field_name . ' text format',
+          '#description' => 'Формат текста, который будет установлен для поля выше.',
+          '#options' => $format_options,
+          '#default_value' => isset($node_fields_code[$field_name . '_format']) ? $node_fields_code[$field_name . '_format'] : '',
+        );
+      }
+    }
+  }
+  
+  $form['node_prepare_code'] = array(
+    '#type' => 'textarea',
+    '#title' => 'Пост обработка ноды',
+    '#description' => 'Код, который будет выполнен перед вызовом node_save(). Доступные переменные: $node - объект ноды, $page - html код страницы, $doc - объект phpQuery. Пример заполнения: <code>$node->title = \'new title\';</code>',
+    '#default_value' => isset($job->node_prepare_code) ? $job->node_prepare_code : '',
+    '#rows' => 3,
+  );
+  
+  $form['actions'] = array(
+    '#type' => 'actions',
+  );
+  
+  $form['actions']['submit'] = array(
+    '#type' => 'submit',
+    '#value' => 'Сохранить задание',
+  );
+  
+  $form['actions']['start_parsing'] = array(
+    '#type' => 'submit',
+    '#value' => 'Начать парсинг',
+  );
+  
+  $form['actions']['submit_and_start_parsing'] = array(
+    '#type' => 'submit',
+    '#value' => 'Сохранить задание и Начать парсинг',
+  );
+  
+  _parser_set_rows($form);
+  _parser_set_rows($form['fields']['node_fields_code']);
+  
+  return $form;
+}
+
+/**
+ * Ajax callback
+ */
+function parser_job_form_fields($form, $form_state) {
+  return $form['fields']['node_fields_code'];
+}
+
+/**
+ * Entity form submit callback
+ */
+function parser_job_form_submit(&$form, &$form_state) {
+  $clicked_button = $form_state['clicked_button']['#value'];
+  $node_fields_code = $form_state['values']['node_fields_code'];
+  $node_fields_code = array_diff($node_fields_code, array(''));
+  $form_state['values']['node_fields_code'] = serialize($node_fields_code);
+
+  if ($clicked_button == 'Сохранить задание' || $clicked_button == 'Сохранить задание и Начать парсинг') {
+    $job = entity_ui_form_submit_build_entity($form, $form_state);
+    $job->save();
+  }
+  
+  if ($clicked_button == 'Сохранить задание') {
+    drupal_set_message('Задание сохранено.');
+    $form_state['redirect'] = 'admin/structure/parser_jobs/manage/' . $job->id;
+  }
+  
+  if ($clicked_button == 'Начать парсинг' || $clicked_button == 'Сохранить задание и Начать парсинг') {
+    $values = $form_state['values'];
+    
+    _parser_url_delete_all();
+    _parser_url_add($values['start_url']);
+  
+    $batch = array(
+      'title' => 'Парсинг',
+      'progress_message' => '',
+      'operations' => array(
+        array('parser_parse', array(
+          $values['depth'],
+          $values['node_limit'],
+          trim($values['white_list']),
+          trim($values['black_list']),
+          trim($values['check_code']),
+          $values['node_type'],
+          trim($values['node_title_code']),
+          $node_fields_code,
+          trim($values['node_prepare_code']),
+        )),
+      ),
+      'finished' => 'parser_finished',
+    );
+  
+    batch_set($batch); 
+    batch_process();
+  }
+}
+
+/**
+ * Parse page
+ */
+function parser_parse($depth, $node_limit, $white_list, $black_list, $check_code, $node_type, $node_title_code, $node_fields_code, $node_prepare_code, &$context) {
+  if (empty($context['sandbox'])) {
+    $context['sandbox']['progress'] = 0;
+    $context['sandbox']['num_created_node'] = 0;
+  }
+  
+  // Parsing -----------------------------------------------------------------------------------------------------------
+  $url = _parser_url_get_not_parsed();
+  $parsed_url = parse_url($url->url);
+  $page = _parser_get_page_by_url($url->url);
+  
+  // Init phpQuery
+  require_once('phpQuery/phpQuery/phpQuery.php');
+  $doc = phpQuery::newDocumentHTML($page);
+  
+  // Find links
+  if ($url->depth < $depth) {
+    foreach ($doc->find('a') as $element) {
+      $href = pq($element)->attr('href');
+      $href = _parser_get_full_url($href, $url->url);
+      
+      $allowed = FALSE;
+      if ($white_list && drupal_match_path($href, $white_list)) {
+        $allowed = TRUE;
+      }
+      if ($black_list && drupal_match_path($href, $black_list)) {
+        $allowed = FALSE;
+      }
+      if ($allowed) {
+        _parser_url_add($href, $url->depth + 1);
+      }
+    }
+  }
+  
+  $allowed_parse = TRUE;
+  if ($check_code) {
+    $allowed_parse = eval($check_code);
+  }
+  
+  // Parse page
+  if ($allowed_parse && $context['sandbox']['num_created_node'] < $node_limit) {
+    $fields = field_info_fields();
+    $instances = field_info_instances();
+    
+    $nid = _parser_get_nid_by_url($url->url);
+    if ($nid) {
+      $node = node_load($nid);
+    }
+    else {
+      $node = new stdClass();
+      $node->type = $node_type;
+      $node->language = LANGUAGE_NONE;
+    }
+    
+    $node->title = eval($node_title_code);
+    
+    foreach ($node_fields_code as $field_name => $php_code) {
+      if (isset($fields[$field_name])) {
+        $result = eval($php_code);
+        $function = '_parser_add_field_' . $fields[$field_name]['type'];
+        if (!function_exists($function)) {
+          $function = '_parser_add_field';
+        }
+        $function($node, $field_name, $result, $fields, $instances, $node_fields_code, $url->url);
+      }
+    }
+    
+    node_object_prepare($node);
+    if ($node_prepare_code) {
+      eval($node_prepare_code);
+    }
+    node_save($node);
+    
+    if (!$nid) {
+      _parser_node_add($node->nid, $url->url);
+    }
+    
+    $context['sandbox']['num_created_node']++;
+  }
+  
+  _parser_url_mark_parsed($url->url);
+  // -------------------------------------------------------------------------------------------------------------------
+
+  $context['sandbox']['max'] = _parser_url_count();
+  $context['sandbox']['progress']++;
+  $context['message'] = 'Парсинг страницы <em>' . $url->url . '</em> завершён';
+
+  if ($context['sandbox']['progress'] != $context['sandbox']['max']) {
+    $context['finished'] = $context['sandbox']['progress'] / $context['sandbox']['max'];
+  }
+}
+
+/**
+ * Site is parsed.
+ */
+function parser_finished($success, $results, $operations) {
+  if ($success) {
+    drupal_set_message(t('Парсинг закончен.'));
+  }
+  else {
+    drupal_set_message(t('Парсинг закончился с ошибками.'));
+  }
+}
+
+/**
+ * Implements of hook_node_delete().
+ */
+function parser_node_delete($node) {
+  db_delete('parser_nodes')
+    ->condition('nid', $node->nid)
+    ->execute();
+}
+
+/**
+ * Get URL info
+ */
+function _parser_url_get($url) {
+  return db_select('parser_urls', 'pu')
+    ->fields('pu')
+    ->condition('url', $url)
+    ->execute()
+    ->fetchObject();
+}
+
+/**
+ * Get first not parsed URL info
+ */
+function _parser_url_get_not_parsed() {
+  return db_select('parser_urls', 'pu')
+    ->fields('pu')
+    ->condition('parsed', 0)
+    ->range(0, 1)
+    ->execute()
+    ->fetchObject();
+}
+
+/**
+ * Adding URL to database
+ */
+function _parser_url_add($url, $depth = 0) {
+  if (!_parser_url_get($url)) {
+    db_insert('parser_urls')
+      ->fields(array('url' => $url, 'depth' => $depth))
+      ->execute();
+  }
+}
+
+/**
+ * Mark URL as parsed
+ */
+function _parser_url_mark_parsed($url) {
+  db_update('parser_urls')
+    ->fields(array('parsed' => 1))
+    ->condition('url', $url)
+    ->execute();
+}
+
+/**
+ * Delete all URLs from database
+ */
+function _parser_url_delete_all() {
+  db_truncate('parser_urls')->execute();
+}
+
+/**
+ * Get count not parsed URLs
+ */
+function _parser_url_count($parsed = null) {
+  $query = db_select('parser_urls')->countQuery();
+  if (!is_null($parsed)) {
+    $query->condition('parsed', $parsed);
+  }
+  return $query->execute()->fetchField();
+}
+
+/**
+ * Return page html by URL
+ */
+function _parser_get_page_by_url($url) {
+  $cached_data = cache_get('parser:' . $url);
+  if (!$cached_data) {
+    $result = drupal_http_request($url, array('headers' => array('User-Agent' => 'Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1; SV1)')));
+    $page = $result->data;
+    cache_set('parser:' . $url, $page);
+  }
+  else {
+    $page = $cached_data->data;
+  }
+  return $page;
+}
+
+/**
+ * Attach field to node object
+ */
+function _parser_add_field(&$node, $field_name, $field_value, $fields, $instances, $node_fields_code, $page_url) {
+  $node->{$field_name} = $field_value;
+}
+
+/**
+ * Attach field type "text" to node object
+ */
+function _parser_add_field_text(&$node, $field_name, $field_value, $fields, $instances, $node_fields_code, $page_url) {
+  $node->{$field_name}[$node->language][0]['value'] = $field_value;
+  
+  if ($instances['node'][$node->type][$field_name]['settings']['text_processing']) {
+    $node->{$field_name}[$node->language][0]['format'] = $node_fields_code[$field_name . '_format'];
+  }
+}
+
+/**
+ * Attach field type "text_with_summary" to node object
+ */
+function _parser_add_field_text_with_summary(&$node, $field_name, $field_value, $fields, $instances, $node_fields_code, $page_url) {
+  _parser_add_field_text($node, $field_name, $field_value, $fields, $instances, $node_fields_code, $page_url);
+}
+
+/**
+ * Attach field type "text" to node object
+ */
+function _parser_add_field_image(&$node, $field_name, $field_value, $fields, $instances, $node_fields_code, $page_url) {
+  if (!$field_value) {
+    return FALSE;
+  }
+  
+  $field_settings = $instances['node'][$node->type][$field_name]['settings'];
+  
+  $allowed_file_extensions = str_replace(' ', '|', $field_settings['file_extensions']);
+  if (!preg_match('#\.(' . $allowed_file_extensions . ')$#i', $field_value)) {
+    return FALSE;
+  }
+  
+  // Save remote file to server
+  $file_url = _parser_get_full_url($field_value, $page_url);
+  $result = drupal_http_request($field_value);
+  
+  if (!$result->data) {
+    return FALSE;
+  }
+  
+  $dest_dir = 'public://' . $field_settings['file_directory'];
+  file_prepare_directory($dest_dir, FILE_CREATE_DIRECTORY);
+  $filepath = $dest_dir . '/' . basename($field_value);
+  $file = file_save_data($result->data, $filepath);
+
+  if (isset($node->{$field_name})) {
+    unset($node->{$field_name});
+  }
+  
+  $node->{$field_name}[$node->language][0] = (array)$file;
+}
+
+/**
+ * Attach field type "taxonomy_term_reference" to node object
+ */
+function _parser_add_field_taxonomy_term_reference(&$node, $field_name, $field_value, $fields, $instances, $node_fields_code, $page_url) {
+  if (is_string($field_value)) {
+    $field_value = array($field_value);
+  }
+  
+  if (isset($node->{$field_name})) {
+    unset($node->{$field_name});
+  }
+  
+  $voc_machine_name = $fields[$field_name]['settings']['allowed_values'][0]['vocabulary'];
+  $voc = taxonomy_vocabulary_machine_name_load($voc_machine_name);
+
+  foreach ($field_value as $term_name) {
+    $term = current(taxonomy_term_load_multiple(array(), array('name' => $term_name, 'vid' => $voc->vid)));
+    if (!$term) {
+      $term = (object)array('vid' => $voc->vid, 'name' => $term_name);
+      taxonomy_term_save($term);
+    }
+    $node->{$field_name}[$node->language][]['tid'] = $term->tid;
+  }
+}
+
+/**
+ * Add relations node to url
+ */
+function _parser_node_add($nid, $url) {
+  db_insert('parser_nodes')->fields(array('nid' => $nid, 'url' => $url))->execute();
+}
+
+/**
+ * Return nid by URL
+ */
+function _parser_get_nid_by_url($url) {
+  return db_select('parser_nodes', 'pn')
+    ->fields('pn', array('nid'))
+    ->condition('url', $url)
+    ->execute()
+    ->fetchField();
+}
+
+/**
+ * Return row count
+ */
+function _parser_get_rows($text) {
+  $count = substr_count(trim($text), "\n") + 1;
+  return $count > 3 ? $count : 3;
+}
+
+/**
+ * Set row count
+ */
+function _parser_set_rows(&$form) {
+  foreach ($form as &$element) {
+    if (isset($element['#type']) && $element['#type'] == 'textarea') {
+      $element['#rows'] = _parser_get_rows($element['#default_value']);
+    }
+  }
+}
+
+/**
+ * Return full url.
+ */
+function _parser_get_full_url($url, $page_url) {
+  $url = trim($url);
+  $url = preg_replace('/#.+/', '', $url);
+  $page_url_parsed = parse_url($page_url);
+
+  if (substr($url, 0, 1) == '/') {
+    $url = $page_url_parsed['scheme'] . '://' . $page_url_parsed['host'] . $url;
+  }
+  elseif (strpos($url, 'http') !== 0) {
+    $page_url = rtrim($page_url, '/');
+    $page_url = preg_replace('#/[^/]+$#', '', $page_url);
+    $url = $page_url . '/' . $url;
+  }
+  
+  return $url;
+}

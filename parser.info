@@ -1,0 +1,5 @@
+name = Parser
+description = Parse html pages to nodes
+version = 7.x-1.x-dev
+core = 7.x
+dependencies[] = entity

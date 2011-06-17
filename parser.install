@@ -78,6 +78,19 @@ function parser_schema() {
         'type' => 'text',
         'not null' => TRUE,
       ),
+      'status' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0x01,
+        'size' => 'tiny',
+        'description' => 'The exportable status of the entity.',
+      ),
+      'module' => array(
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => FALSE,
+        'description' => 'The name of the providing module if the entity has been defined in code.',
+      ),
     ),
     'primary key' => array('id'),
   );

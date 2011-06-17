@@ -31,6 +31,7 @@ function parser_entity_info() {
       ),
       'access callback' => 'parser_job_access',
       'module' => 'parser',
+      'exportable' => TRUE,
     ),
   );
 }

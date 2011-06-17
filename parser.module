@@ -405,10 +405,10 @@ function parser_parse($depth, $node_limit, $white_list, $black_list, $check_code
  */
 function parser_finished($success, $results, $operations) {
   if ($success) {
-    drupal_set_message(t('Парсинг закончен.'));
+    drupal_set_message('Парсинг закончен.');
   }
   else {
-    drupal_set_message(t('Парсинг закончился с ошибками.'));
+    drupal_set_message('Парсинг закончился с ошибками.');
   }
 }
 

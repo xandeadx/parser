@@ -23,6 +23,12 @@ function parser_schema() {
         'not null' => TRUE,
         'default' => '',
       ),
+      'test_url' => array(
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
       'depth' => array(
         'type' => 'int',
         'size' => 'tiny',
@@ -53,6 +59,12 @@ function parser_schema() {
         'length' => 20,
         'not null' => TRUE,
         'default' => '',
+      ),
+      'node_language' => array(
+        'type' => 'varchar',
+        'length' => 3,
+        'not null' => TRUE,
+        'default' => 'und',
       ),
       'node_title_code' => array(
         'type' => 'text',
@@ -121,6 +133,7 @@ function parser_install() {
   $job = array(
     'title' => 'Парсинг шаблонов с drupal.org',
     'start_url' => 'http://drupal.org/project/themes',
+    'test_url' => 'http://drupal.org/project/zen',
     'depth' => 1,
     'node_limit' => 5,
     'white_list' => 'http://drupal.org/project/*',
@@ -133,6 +146,7 @@ function parser_install() {
       '  return TRUE;' . "\n" .
       '}',
     'node_type' => 'article',
+    'node_language' => 'und',
     'node_title_code' => 'return $doc->find(\'h1#page-subtitle\')->text();',
     'node_fields_code' => serialize(array(
       'body' => '' .

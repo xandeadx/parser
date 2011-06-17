@@ -1,0 +1,11 @@
+
+input.check-button {
+  float: right;
+  margin: -1.8em 0 .2em 0 !important;
+  padding: 0em .7em .2em .7em !important;
+  font-size: .85em !important;
+}
+
+#parser-dialog pre {
+  font-size: .9em;
+}

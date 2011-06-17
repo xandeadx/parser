@@ -140,7 +140,8 @@ function parser_install() {
     'black_list' => '' . 
       'http://drupal.org/project/issues/*' . "\n" .
       'http://drupal.org/project/themes?solrsort*' . "\n" .
-      'http://drupal.org/project/themes?filters*',
+      'http://drupal.org/project/themes?filters*' . "\n" .
+      'http://drupal.org/project/modules*',
     'check_code' => '' .
       'if ($doc->find(\'a[href="/project/themes"].active\')->length() && $doc->find(\'.view-project-release-download-table\')->length()) {' . "\n" .
       '  return TRUE;' . "\n" .

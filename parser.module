@@ -242,9 +242,9 @@ function parser_job_form($form, &$form_state, $job) {
   _parser_set_rows($form['fields']['node_fields_code']);
   
   $parser_path = drupal_get_path('module', 'parser');
-  $form['#attached']['css'][] = $parser_path . '/parser.css';
-  $form['#attached']['js'][]  = $parser_path . '/parser.js';
   $form['#attached']['library'][] = array('system', 'ui.dialog');
+  $form['#attached']['css'][] = $parser_path . '/parser.css';
+  $form['#attached']['js'][] = $parser_path . '/parser.js';
   
   return $form;
 }
@@ -330,13 +330,16 @@ function parser_parse($depth, $node_limit, $white_list, $black_list, $check_code
       $href = pq($element)->attr('href');
       $href = _parser_get_full_url($href, $url->url);
       
-      $allowed = FALSE;
-      if ($white_list && drupal_match_path($href, $white_list)) {
+      if ($white_list) {
+        $allowed = drupal_match_path($href, $white_list) ? TRUE : FALSE;
+      }
+      else {
         $allowed = TRUE;
       }
-      if ($black_list && drupal_match_path($href, $black_list)) {
-        $allowed = FALSE;
+      if ($black_list) {
+        $allowed = drupal_match_path($href, $black_list) ? FALSE : TRUE;
       }
+      
       if ($allowed) {
         _parser_url_add($href, $url->depth + 1);
       }

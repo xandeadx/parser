@@ -9,6 +9,15 @@ function parser_menu() {
     'access arguments' => array('administer node'),
     'type' => MENU_CALLBACK,
   );
+  
+  $items['admin/structure/parser_jobs/urls/%parser_job'] = array(
+    'title' => 'Parser results',
+    'page callback' => 'parser_result_page',
+    'page arguments' => array(4),
+    'access arguments' => array('administer node'),
+    'type' => MENU_CALLBACK,
+  );
+  
   return $items;
 }
 
@@ -228,14 +237,14 @@ function parser_job_form($form, &$form_state, $job) {
     '#value' => 'Сохранить задание',
   );
   
-  $form['actions']['start_parsing'] = array(
-    '#type' => 'submit',
-    '#value' => 'Начать парсинг',
-  );
-  
   $form['actions']['submit_and_start_parsing'] = array(
     '#type' => 'submit',
     '#value' => 'Сохранить задание и Начать парсинг',
+  );
+  
+  $form['actions']['start_parsing'] = array(
+    '#type' => 'submit',
+    '#value' => 'Начать парсинг',
   );
   
   _parser_set_rows($form);
@@ -300,9 +309,12 @@ function parser_job_form_submit(&$form, &$form_state) {
       ),
       'finished' => 'parser_finished',
     );
-  
-    batch_set($batch); 
-    batch_process();
+
+    batch_set($batch);
+    cache_set('parser_job_info', array(
+      'job_id' => $form_state['parser_job']->id,
+      'start' => time(),
+    ));
   }
 }
 
@@ -390,6 +402,7 @@ function parser_parse($depth, $node_limit, $white_list, $black_list, $check_code
     }
     
     $context['sandbox']['num_created_node']++;
+    $context['results'][] = $node->title;
   }
   
   _parser_url_mark_parsed($url->url);
@@ -399,17 +412,25 @@ function parser_parse($depth, $node_limit, $white_list, $black_list, $check_code
   $context['sandbox']['progress']++;
   $context['message'] = 'Парсинг страницы <em>' . $url->url . '</em> завершён';
 
-  if ($context['sandbox']['progress'] != $context['sandbox']['max']) {
+  if ($node_limit && $context['sandbox']['num_created_node'] >= $node_limit) {
+    $context['finished'] = 1;
+  }
+  else if ($context['sandbox']['progress'] != $context['sandbox']['max']) {
     $context['finished'] = $context['sandbox']['progress'] / $context['sandbox']['max'];
   }
 }
 
 /**
- * Site is parsed.
+ * Site is parsed
  */
 function parser_finished($success, $results, $operations) {
   if ($success) {
-    drupal_set_message('Парсинг закончен.');
+    $cache = cache_get('parser_job_info');
+    drupal_set_message('
+        Парсинг закончен.
+        Создано/обновлено нод: ' . l(count($results), 'admin/structure/parser_jobs/urls/' . $cache->data['job_id']) . '.
+        Затраченное время: ' . gmdate('H:i:s', time() - $cache->data['start']) . '
+    ');
   }
   else {
     drupal_set_message('Парсинг закончился с ошибками.');
@@ -454,6 +475,32 @@ function parser_check_code() {
   $result = eval($_POST['field_value']);
   
   echo htmlspecialchars(print_r($result, true));
+}
+
+/**
+ * Result page
+ */
+function parser_result_page($job) {
+  $query = db_select('parser_nodes', 'pn');
+  $query->fields('pn', array('nid', 'url'));
+  $query->fields('n', array('title'));
+  $query->leftJoin('node', 'n', 'pn.nid = n.nid');
+  $result = $query->execute();
+  
+  $rows = array();
+  foreach ($result as $row) {
+    $rows[] = array(
+      l($row->url, $row->url),
+      l($row->nid, 'node/' . $row->nid),
+      $row->title,
+    );
+  }
+    
+  return theme('table', array(
+    'header' => array('URL', 'Nid', t('Title')),
+    'rows' => $rows,
+    'empty' => 'Пусто...',
+  ));
 }
 
 /**
@@ -728,7 +775,7 @@ function _parser_set_rows(&$form) {
 }
 
 /**
- * Return full url.
+ * Return full url
  */
 function _parser_get_full_url($url, $page_url) {
   $url = trim($url);

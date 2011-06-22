@@ -447,8 +447,10 @@ function parser_finished($success, $results, $operations) {
     $cache = cache_get('parser_job_info');
     drupal_set_message('
         Парсинг закончен.
+        Обработано страниц: ' . _parser_url_count(TRUE) . '.
         Создано/обновлено нод: ' . l(count($results), 'admin/structure/parser_jobs/results/' . $cache->data['job_id']) . '.
-        Затраченное время: ' . gmdate('H:i:s', time() - $cache->data['start']) . '
+        Затрачено времени: ' . gmdate('H:i:s', time() - $cache->data['start']) . '.
+        ' . l('Посмотреть системный журнал', 'admin/reports/dblog') . '.
     ');
   }
   else {
@@ -587,11 +589,11 @@ function _parser_url_delete_all() {
  * Get count not parsed URLs
  */
 function _parser_url_count($parsed = null) {
-  $query = db_select('parser_urls')->countQuery();
+  $query = db_select('parser_urls', 'pu');
   if (!is_null($parsed)) {
-    $query->condition('parsed', $parsed);
+    $query->condition('pu.parsed', $parsed);
   }
-  return $query->execute()->fetchField();
+  return $query->countQuery()->execute()->fetchField();
 }
 
 /**
@@ -600,7 +602,7 @@ function _parser_url_count($parsed = null) {
 function _parser_get_page_by_url($url) {
   $cached_data = cache_get('parser:' . $url);
   if (!$cached_data) {
-    $result = drupal_http_request($url, array('headers' => array('User-Agent' => 'Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1; SV1)')));
+    $result = drupal_http_request($url, array('headers' => array('User-Agent' => 'Opera/9.80 (Windows NT 6.1; U; ru) Presto/2.8.131 Version/11.10')));
     $page = isset($result->data) ? $result->data : '';
     if ($page) {
       cache_set('parser:' . $url, $page);

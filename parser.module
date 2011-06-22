@@ -82,6 +82,13 @@ function parser_job_form($form, &$form_state, $job) {
     '#default_value' => isset($job->start_url) ? $job->start_url : '',
   );
   
+  $form['only_this_domen'] = array(
+    '#type' => 'checkbox',
+    '#title' => 'Парсить только с этого же домена',
+    '#description' => 'Отметьте, если хотите чтобы парсер работал только на указанном выше домене.',
+    '#default_value' => isset($job->only_this_domen) ? $job->only_this_domen : TRUE,
+  );
+  
   $form['test_url'] = array(
     '#type' => 'textfield',
     '#title' => 'URL тестовой страницы',
@@ -295,6 +302,7 @@ function parser_job_form_submit(&$form, &$form_state) {
       'progress_message' => '',
       'operations' => array(
         array('parser_parse', array(
+          $values['only_this_domen'],
           $values['depth'],
           $values['node_limit'],
           trim($values['white_list']),
@@ -321,7 +329,7 @@ function parser_job_form_submit(&$form, &$form_state) {
 /**
  * Parse page
  */
-function parser_parse($depth, $node_limit, $white_list, $black_list, $check_code, $node_type, $node_language, $node_title_code, $node_fields_code, $node_prepare_code, &$context) {
+function parser_parse($only_this_domen, $depth, $node_limit, $white_list, $black_list, $check_code, $node_type, $node_language, $node_title_code, $node_fields_code, $node_prepare_code, &$context) {
   if (empty($context['sandbox'])) {
     $context['sandbox']['progress'] = 0;
     $context['sandbox']['num_created_node'] = 0;
@@ -351,6 +359,10 @@ function parser_parse($depth, $node_limit, $white_list, $black_list, $check_code
       if ($black_list) {
         $allowed = drupal_match_path($href, $black_list) ? FALSE : TRUE;
       }
+      if ($allowed && $only_this_domen) {
+        $parsed_href = parse_url($href);
+        $allowed = ($parsed_url['host'] == $parsed_href['host']);
+      }
       
       if ($allowed) {
         _parser_url_add($href, $url->depth + 1);
@@ -358,7 +370,6 @@ function parser_parse($depth, $node_limit, $white_list, $black_list, $check_code
     }
   }
   
-  $allowed_parse = TRUE;
   if ($check_code) {
     $allowed_parse = eval($check_code);
   }

@@ -23,6 +23,13 @@ function parser_schema() {
         'not null' => TRUE,
         'default' => '',
       ),
+      'only_this_domen' => array(
+        'type' => 'int',
+        'size' => 'tiny',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 1,
+      ),
       'test_url' => array(
         'type' => 'varchar',
         'length' => 255,

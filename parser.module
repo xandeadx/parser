@@ -605,7 +605,7 @@ function _parser_get_page_by_url($url) {
     $result = drupal_http_request($url, array('headers' => array('User-Agent' => 'Opera/9.80 (Windows NT 6.1; U; ru) Presto/2.8.131 Version/11.10')));
     $page = isset($result->data) ? $result->data : '';
     if ($page) {
-      if (preg_match('#<meta http-equiv="Content-Type" content="text/html; charset=(.+?)"#iU', $page, $matches)) {
+      if (preg_match('#<meta http-equiv="Content-Type" content="text/html; charset=(.+?)"#iU', $page, $matches) && strtolower($matches[1]) != 'utf-8') {
         $page = iconv($matches[1], 'UTF-8', $page);
       }
       cache_set('parser:' . $url, $page);

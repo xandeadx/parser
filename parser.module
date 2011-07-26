@@ -346,15 +346,15 @@ function parser_parse($only_this_domen, $depth, $node_limit, $white_list, $black
   
   // Find links
   if ($url->depth < $depth) {
-    foreach ($doc->find('a') as $element) {
-      $href = pq($element)->attr('href');
+    foreach ($doc->find('a') as $a) {
+      $href = pq($a)->attr('href');
       $href = _parser_get_full_url($href, $url->url);
       
       $allowed = TRUE;
       if ($white_list) {
         $allowed = drupal_match_path($href, $white_list) ? TRUE : FALSE;
       }
-      if ($black_list) {
+      if ($allowed && $black_list) {
         $allowed = drupal_match_path($href, $black_list) ? FALSE : TRUE;
       }
       if ($allowed && $only_this_domen) {
@@ -684,16 +684,18 @@ function _parser_add_field_image(&$node, $field_name, $field_values, $fields, $i
     }
     
     // If image already attached, then break current iteration
-    $cur_image_already_attached = FALSE;
-    foreach ($node->{$field_name}[$node->language] as $old_image) {
-      if ($old_image['filename'] == $image_name) {
-        $files[] = $old_image;
-        $cur_image_already_attached = TRUE;
-        break;
+    if (isset($node->{$field_name})) {
+      $cur_image_already_attached = FALSE;
+      foreach ($node->{$field_name}[$node->language] as $old_image) {
+        if ($old_image['filename'] == $image_name) {
+          $files[] = $old_image;
+          $cur_image_already_attached = TRUE;
+          break;
+        }
       }
-    }
-    if ($cur_image_already_attached) {
-      continue;
+      if ($cur_image_already_attached) {
+        continue;
+      }
     }
     
     // Validate by extensions

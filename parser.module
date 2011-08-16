@@ -173,7 +173,6 @@ function parser_job_form($form, &$form_state, $job) {
     '#title' => 'title',
     '#collapsible' => TRUE,
     '#collapsed' => TRUE,
-    '#group' => 'vertical_tabs',
   );
   
   $form['fields']['node_title_code_fieldset']['node_title_code'] = array(
@@ -221,7 +220,6 @@ function parser_job_form($form, &$form_state, $job) {
         '#title' => $field_name,
         '#collapsible' => TRUE,
         '#collapsed' => TRUE,
-        '#group' => 'vertical_tabs',
       );
   
       $form['fields']['node_fields_code'][$fieldset_name][$field_name] = array(

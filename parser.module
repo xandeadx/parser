@@ -168,7 +168,15 @@ function parser_job_form($form, &$form_state, $job) {
     '#description' => 'Поля заполняются без обёртки кода в &lt;?php и ?&gt;. Во всех полях доступны две переменные $page - html код страницы, $doc - объект phpQuery.',
   );
   
-  $form['fields']['node_title_code'] = array(
+  $form['fields']['node_title_code_fieldset'] = array(
+    '#type' => 'fieldset',
+    '#title' => 'title',
+    '#collapsible' => TRUE,
+    '#collapsed' => TRUE,
+    '#group' => 'vertical_tabs',
+  );
+  
+  $form['fields']['node_title_code_fieldset']['node_title_code'] = array(
     '#type' => 'textarea',
     '#title' => 'title',
     '#description' => 'PHP код, который должен вернуть заголовок ноды. Пример заполнения: <code>return $doc->find(\'h1\')->text();</code>',
@@ -206,22 +214,38 @@ function parser_job_form($form, &$form_state, $job) {
     if (isset($field['bundles']['node']) && in_array($node_type, $field['bundles']['node'])) {
       $description = isset($descriptions[$field['type']]) ? $descriptions[$field['type']] : $descriptions['default'];
       $description .= !function_exists('_parser_add_field_' . $field['type']) ? ' <span style="color:red;">Тип поля не поддерживается, это значит что код должен вернуть структуру поля. Например: <code>return array(0 => array(\'value\' => $doc->find(\'#some-id\')->text()));</code></span>' : '';
-        
-      $form['fields']['node_fields_code'][$field_name] = array(
-        '#type' => 'textarea',
+      $fieldset_name = $field_name . '_fieldset';
+      
+      $form['fields']['node_fields_code'][$fieldset_name] = array(
+        '#type' => 'fieldset',
         '#title' => $field_name,
+        '#collapsible' => TRUE,
+        '#collapsed' => TRUE,
+        '#group' => 'vertical_tabs',
+      );
+  
+      $form['fields']['node_fields_code'][$fieldset_name][$field_name] = array(
+        '#type' => 'textarea',
+        '#title' => 'PHP код',
         '#description' => $description,
         '#default_value' => isset($node_fields_code[$field_name]) ? $node_fields_code[$field_name] : '',
         '#rows' => 3,
       ) + $check_button;
 
       if (!empty($instances['node'][$node_type][$field_name]['settings']['text_processing'])) {
-        $form['fields']['node_fields_code'][$field_name . '_format'] = array(
+        $form['fields']['node_fields_code'][$fieldset_name][$field_name . '_format'] = array(
           '#type' => 'select',
-          '#title' => $field_name . ' text format',
+          '#title' => 'Формат текста',
           '#description' => 'Формат текста, который будет установлен для поля выше.',
           '#options' => $format_options,
           '#default_value' => isset($node_fields_code[$field_name . '_format']) ? $node_fields_code[$field_name . '_format'] : '',
+        );
+      }
+      
+      if ($field['type'] == 'taxonomy_term_reference') {
+        $form['fields']['node_fields_code'][$fieldset_name][$field_name . '_clear_voc'] = array(
+          '#type' => 'checkbox',
+          '#title' => 'Очистить словарь перед парсингом.',
         );
       }
     }
@@ -277,10 +301,17 @@ function parser_job_form_fields($form, $form_state) {
  */
 function parser_job_form_submit(&$form, &$form_state) {
   $clicked_button = $form_state['clicked_button']['#value'];
-  $node_fields_code = $form_state['values']['node_fields_code'];
+  $fields = field_info_fields();
+  
+  $node_fields_code = array();
+  foreach ($form_state['values']['node_fields_code'] as $fieldset) {
+    foreach ($fieldset as $field_name => $field_value) {
+      $node_fields_code[$field_name] = $field_value;
+    }
+  }
   $node_fields_code = array_diff($node_fields_code, array(''));
   $form_state['values']['node_fields_code'] = $node_fields_code;
-
+  
   if ($clicked_button == 'Сохранить задание' || $clicked_button == 'Сохранить задание и Начать парсинг') {
     $job = entity_ui_form_submit_build_entity($form, $form_state);
     $job->save();
@@ -293,6 +324,13 @@ function parser_job_form_submit(&$form, &$form_state) {
   
   if ($clicked_button == 'Начать парсинг' || $clicked_button == 'Сохранить задание и Начать парсинг') {
     $values = $form_state['values'];
+    
+    // Clear vocabularies
+    foreach ($fields as $field_name => $field) {
+      if ($field['type'] == 'taxonomy_term_reference' && $node_fields_code[$field_name . '_clear_voc']) {
+        _parser_clear_vocabulary($field['settings']['allowed_values'][0]['vocabulary']);
+      }
+    }
     
     _parser_url_delete_all();
     _parser_url_add($values['start_url']);
@@ -743,6 +781,7 @@ function _parser_add_field_taxonomy_term_reference(&$node, $field_name, $field_v
   $voc = taxonomy_vocabulary_machine_name_load($voc_machine_name);
 
   foreach ($field_values as $term_name) {
+    $term_name = trim($term_name);
     $term = current(taxonomy_term_load_multiple(array(), array('name' => $term_name, 'vid' => $voc->vid)));
     if (!$term) {
       $term = (object)array('vid' => $voc->vid, 'name' => $term_name);
@@ -851,4 +890,16 @@ function _parser_download_file_use_curl($file_url, $destination) {
   fclose($fp);
   
   return $error;
+}
+
+/**
+ * Clear vocabulary
+ */
+function _parser_clear_vocabulary($vocabulary_name) {
+  $vocabulary = taxonomy_vocabulary_machine_name_load($vocabulary_name);
+  $terms = taxonomy_get_tree($vocabulary->vid);
+
+  foreach ($terms as $term) {
+    taxonomy_term_delete($term->tid);
+  }
 }

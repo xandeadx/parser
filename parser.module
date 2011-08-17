@@ -204,6 +204,7 @@ function parser_job_form($form, &$form_state, $job) {
   }
   $descriptions = array(
     'default' => 'PHP код, который должен вернуть значение поля.',
+    'file' => 'PHP код, который должен вернуть URL файла. Адрес может быть как абсолютный, так и относительный. Все файлы будут закачаны на текущий сервер, в директорию указанную в настройках поля. Пример заполнения: <code>return $doc->find(\'a.download-link\')->attr(\'href\');</code>',
     'image' => 'PHP код, который должен вернуть URL картинки. Адрес может быть как абсолютный, так и относительный. Все картинки будут закачаны на текущий сервер, в директорию указанную в настройках поля. Пример заполнения: <code>return $doc->find(\'.cover img\')->attr(\'src\');</code>',
     'taxonomy_term_reference' => 'PHP код, который должен вернуть название термина, либо массив названий. Отсутствующие термины будут созданы автоматически. Пример заполнения:<br /><code>$terms = array();<br />foreach ($doc->find(\'.tags li\') as $li) $terms[] = pq($li)->text();<br />return $terms;</code>',
     'text_with_summary' => 'PHP код, который должен вернуть значение поля. Пример заполнения: <code>return $doc->find(\'article.content\')->html();</code>',
@@ -277,7 +278,6 @@ function parser_job_form($form, &$form_state, $job) {
   );
   
   _parser_set_rows($form);
-  _parser_set_rows($form['fields']['node_fields_code']);
   
   $parser_path = drupal_get_path('module', 'parser');
   $form['#attached']['library'][] = array('system', 'ui.dialog');
@@ -299,6 +299,7 @@ function parser_job_form_fields($form, $form_state) {
  */
 function parser_job_form_submit(&$form, &$form_state) {
   $clicked_button = $form_state['clicked_button']['#value'];
+  $values = $form_state['values'];
   $fields = field_info_fields();
   
   $node_fields_code = array();
@@ -321,11 +322,14 @@ function parser_job_form_submit(&$form, &$form_state) {
   }
   
   if ($clicked_button == 'Начать парсинг' || $clicked_button == 'Сохранить задание и Начать парсинг') {
-    $values = $form_state['values'];
-    
     // Clear vocabularies
     foreach ($fields as $field_name => $field) {
-      if ($field['type'] == 'taxonomy_term_reference' && $node_fields_code[$field_name . '_clear_voc']) {
+      if (
+        isset($field['bundles']['node']) &&
+        in_array($values['node_type'], $field['bundles']['node']) &&
+        $field['type'] == 'taxonomy_term_reference' &&
+        $node_fields_code[$field_name . '_clear_voc']
+      ) {
         _parser_clear_vocabulary($field['settings']['allowed_values'][0]['vocabulary']);
       }
     }
@@ -643,6 +647,7 @@ function _parser_get_page_by_url($url) {
     if ($page) {
       if (preg_match('#<meta http-equiv="Content-Type" content="text/html; charset=(.+?)"#iU', $page, $matches) && strtolower($matches[1]) != 'utf-8') {
         $page = iconv($matches[1], 'UTF-8', $page);
+        $page = str_ireplace('<meta http-equiv="Content-Type" content="text/html; charset=' . $matches[1] . '"', '<meta http-equiv="Content-Type" content="text/html; charset=utf-8"', $page);
       }
       cache_set('parser:' . $url, $page);
     }
@@ -694,49 +699,50 @@ function _parser_add_field_text_with_summary(&$node, $field_name, $field_values,
 }
 
 /**
- * Attach field type "text" to node object
+ * Attach field type "file" to node object
  */
-function _parser_add_field_image(&$node, $field_name, $field_values, $fields, $instances, $node_fields_code, $page_url) {
+function _parser_add_field_file(&$node, $field_name, $field_values, $fields, $instances, $node_fields_code, $page_url) {
   if (!$field_values) {
     return FALSE;
   }
   if (!is_array($field_values)) {
     $field_values = array($field_values);
   }
-  
+
   $files = array();
   $field_settings = $instances['node'][$node->type][$field_name]['settings'];
   $dest_dir = 'public://' . $field_settings['file_directory'];
   file_prepare_directory($dest_dir, FILE_CREATE_DIRECTORY);
-  
+
   foreach ($field_values as $field_value) {
     if (!$field_value) {
       continue;
     }
       
-    $image_name = basename($field_value);
+    $file_name = basename($field_value);
     if (function_exists('transliteration_clean_filename')) {
-      $image_name = transliteration_clean_filename($image_name, $node->language);
+      $file_name = transliteration_clean_filename($file_name, $node->language);
     }
     
-    // If image already attached, then break current iteration
-    if (isset($node->{$field_name})) {
-      $cur_image_already_attached = FALSE;
-      foreach ($node->{$field_name}[$node->language] as $old_image) {
-        if ($old_image['filename'] == $image_name) {
-          $files[] = $old_image;
-          $cur_image_already_attached = TRUE;
+    // If file already attached, then break current iteration
+    if (isset($node->{$field_name}[$node->language])) {
+      $cur_file_already_attached = FALSE;
+      foreach ($node->{$field_name}[$node->language] as $old_file) {
+        if ($old_file['filename'] == $file_name) {
+          $files[] = $old_file;
+          $cur_file_already_attached = TRUE;
           break;
         }
       }
-      if ($cur_image_already_attached) {
+      if ($cur_file_already_attached) {
         continue;
       }
     }
     
     // Validate by extensions
     $allowed_file_extensions = str_replace(' ', '|', $field_settings['file_extensions']);
-    if (!preg_match('#\.(' . $allowed_file_extensions . ')$#i', $field_value)) {
+    if (!preg_match('#\.(' . $allowed_file_extensions . ')$#i', $file_name)) {
+      watchdog('parser', 'Файл ' . check_plain($field_value) . ' закачан не будет, так как его тип не в списке допустимых.');
       continue;
     }
     
@@ -745,16 +751,17 @@ function _parser_add_field_image(&$node, $field_name, $field_values, $fields, $i
     $result = drupal_http_request($file_url);
 
     if (!empty($result->error)) {
-      watchdog('parser', 'Ошибка при закачке картинки. <b>Адрес</b>: ' . check_plain($file_url) . ', <b>Ошибка</b>: ' . $result->error . ', <b>Результат</b>: ' . check_plain($result->data));
+      watchdog('parser', 'Ошибка при закачке файла. <b>Адрес</b>: ' . check_plain($file_url) . ', <b>Ошибка</b>: ' . $result->error . ', <b>Результат</b>: ' . check_plain($result->data));
       continue;
     }
     if (!$result->data) {
+      watchdog('parser', 'Ошибка при закачке файла. <b>Адрес</b>: ' . check_plain($file_url) . ', <b>Ошибка</b>: сервер не возвратил данных.');
       continue;
     }
   
-    $filepath = $dest_dir . '/' . $image_name;
+    $filepath = $dest_dir . '/' . $file_name;
     $file = file_save_data($result->data, $filepath);
-    $files[] = (array)$file;
+    $files[] = (array)$file + array('display' => 1);
   }
   
   if (isset($node->{$field_name})) {
@@ -762,6 +769,13 @@ function _parser_add_field_image(&$node, $field_name, $field_values, $fields, $i
   }
   
   $node->{$field_name}[$node->language] = $files;
+}
+
+/**
+ * Attach field type "image" to node object
+ */
+function _parser_add_field_image(&$node, $field_name, $field_values, $fields, $instances, $node_fields_code, $page_url) {
+  _parser_add_field_file($node, $field_name, $field_values, $fields, $instances, $node_fields_code, $page_url);
 }
 
 /**
@@ -845,9 +859,12 @@ function _parser_get_rows($text) {
  * Set row count
  */
 function _parser_set_rows(&$form) {
-  foreach ($form as &$element) {
-    if (isset($element['#type']) && $element['#type'] == 'textarea') {
-      $element['#rows'] = _parser_get_rows($element['#default_value']);
+  foreach (element_children($form) as $element) {
+    if (isset($form[$element]['#type']) && $form[$element]['#type'] == 'textarea') {
+      $form[$element]['#rows'] = _parser_get_rows($form[$element]['#default_value']);
+    }
+    else {
+      _parser_set_rows($form[$element]);
     }
   }
 }

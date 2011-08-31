@@ -723,7 +723,7 @@ function _parser_add_field_file(&$node, $field_name, $field_values, $fields, $in
     if (function_exists('transliteration_clean_filename')) {
       $file_name = transliteration_clean_filename($file_name, $node->language);
     }
-    if (drupal_strlen($file_name) > 64) {
+    if (drupal_strlen(pathinfo($file_name, PATHINFO_FILENAME)) > 64) {
       $file_name = drupal_substr($file_name, 0, 64) . '.' . pathinfo($file_name, PATHINFO_EXTENSION);
     }
     

@@ -723,6 +723,9 @@ function _parser_add_field_file(&$node, $field_name, $field_values, $fields, $in
     if (function_exists('transliteration_clean_filename')) {
       $file_name = transliteration_clean_filename($file_name, $node->language);
     }
+    if (drupal_strlen($file_name) > 64) {
+      $file_name = drupal_substr($file_name, 0, 64) . '.' . pathinfo($file_name, PATHINFO_EXTENSION);
+    }
     
     // If file already attached, then break current iteration
     if (isset($node->{$field_name}[$node->language])) {
@@ -759,9 +762,11 @@ function _parser_add_field_file(&$node, $field_name, $field_values, $fields, $in
       continue;
     }
   
-    $filepath = $dest_dir . '/' . $file_name;
+    $filepath = $dest_dir . ($dest_dir != 'public://' ? '/' : '') . $file_name;
     $file = file_save_data($result->data, $filepath);
-    $files[] = (array)$file + array('display' => 1);
+    if ($file) {
+      $files[] = (array)$file + array('display' => 1);
+    }
   }
   
   if (isset($node->{$field_name})) {

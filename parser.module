@@ -92,7 +92,7 @@ function parser_job_form($form, &$form_state, $job) {
   $form['test_url'] = array(
     '#type' => 'textfield',
     '#title' => 'URL тестовой страницы',
-    '#description' => 'Адрес любой страницы, которая будет использоватья для проверки работоспособности кода.',
+    '#description' => 'Адрес любой страницы, которая будет использоваться для проверки работоспособности кода.',
     '#required' => TRUE,
     '#default_value' => isset($job->test_url) ? $job->test_url : '',
   );
@@ -109,7 +109,7 @@ function parser_job_form($form, &$form_state, $job) {
   $form['node_limit'] = array(
     '#type' => 'textfield',
     '#title' => 'Ограничить число нод',
-    '#description' => 'Введите максимальное чилос нод, которое сможет создать парсер. Укажите 0 если ограничения не нужны.',
+    '#description' => 'Введите максимальное число нод, которое сможет создать парсер. Укажите 0 если ограничения не нужны.',
     '#required' => TRUE,
     '#default_value' => isset($job->node_limit) ? $job->node_limit : 0,
     '#size' => 5,
@@ -134,7 +134,7 @@ function parser_job_form($form, &$form_state, $job) {
   $form['check_code'] = array(
     '#type' => 'textarea',
     '#title' => 'Код проверки для дальнейшего парсинга страницы',
-    '#description' => 'PHP код без тегов &lt;?php и ?&gt;, который должен вернуть TRUE если эту страницу нужно парсить в ноду. Доступные переменные: $page - html код страницы, $doc - объект phpQuery. Пример заполнения: <code>return (bool)$doc->find(\'.node-product\')->length();</code>',
+    '#description' => 'PHP код без тегов &lt;?php и ?&gt;, который должен вернуть TRUE если эту страницу нужно парсить в ноду. Доступные переменные: $page - html код страницы, $doc - объект phpQuery, $page_url - адрес страницы. Пример заполнения: <code>return (bool)$doc->find(\'.node-product\')->length();</code>',
     '#default_value' => isset($job->check_code) ? $job->check_code : '',
     '#rows' => 3,
   ) + $check_button;
@@ -377,8 +377,9 @@ function parser_parse($only_this_domen, $depth, $node_limit, $white_list, $black
   
   // Parsing -----------------------------------------------------------------------------------------------------------
   $url = _parser_url_get_not_parsed();
-  $parsed_url = parse_url($url->url);
-  $page = _parser_get_page_by_url($url->url);
+  $page_url = $url->url;
+  $parsed_url = parse_url($page_url);
+  $page = _parser_get_page_by_url($page_url);
   
   // Init phpQuery
   require_once('phpQuery/phpQuery/phpQuery.php');
@@ -388,7 +389,7 @@ function parser_parse($only_this_domen, $depth, $node_limit, $white_list, $black
   if ($url->depth < $depth) {
     foreach ($doc->find('a') as $a) {
       $href = pq($a)->attr('href');
-      $href = _parser_get_full_url($href, $url->url);
+      $href = _parser_get_full_url($href, $page_url);
       
       $allowed = TRUE;
       if ($white_list) {
@@ -423,7 +424,7 @@ function parser_parse($only_this_domen, $depth, $node_limit, $white_list, $black
     $fields = field_info_fields();
     $instances = field_info_instances();
     
-    $nid = _parser_get_nid_by_url($url->url);
+    $nid = _parser_get_nid_by_url($page_url);
     if ($nid) {
       $node = node_load($nid);
     }
@@ -446,7 +447,7 @@ function parser_parse($only_this_domen, $depth, $node_limit, $white_list, $black
         if (!function_exists($function)) {
           $function = '_parser_add_field';
         }
-        $function($node, $field_name, $result, $fields, $instances, $node_fields_code, $url->url);
+        $function($node, $field_name, $result, $fields, $instances, $node_fields_code, $page_url);
       }
     }
     
@@ -457,19 +458,19 @@ function parser_parse($only_this_domen, $depth, $node_limit, $white_list, $black
     node_save($node);
     
     if (!$nid) {
-      _parser_node_add($node->nid, $url->url);
+      _parser_node_add($node->nid, $page_url);
     }
     
     $context['sandbox']['num_created_node']++;
     $context['results'][] = $node->title;
   }
   
-  _parser_url_mark_parsed($url->url);
+  _parser_url_mark_parsed($page_url);
   // -------------------------------------------------------------------------------------------------------------------
 
   $context['sandbox']['max'] = _parser_url_count();
   $context['sandbox']['progress']++;
-  $context['message'] = 'Завершён парсинг страницы <em>' . $url->url . '</em>';
+  $context['message'] = 'Завершён парсинг страницы <em>' . $page_url . '</em>';
 
   if ($node_limit && $context['sandbox']['num_created_node'] >= $node_limit) {
     $context['finished'] = 1;

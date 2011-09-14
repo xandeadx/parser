@@ -371,11 +371,10 @@ class DOMDocumentWrapper {
 		if (! isset($matches[0]))
 			return;
 		$metaContentType = $matches[0][0];
-		$markup = substr($markup, 0, $matches[0][1])
-			.substr($markup, $matches[0][1]+strlen($metaContentType));
+		$markup = substr($markup, 0, $matches[0][1]).substr($markup, $matches[0][1]+strlen($metaContentType));
 		$headStart = stripos($markup, '<head>');
-		$markup = substr($markup, 0, $headStart+6).$metaContentType
-			.substr($markup, $headStart+6);
+		//$markup = substr($markup, 0, $headStart+6).$metaContentType.substr($markup, $headStart+6);
+        $markup = preg_replace('/(<head[^>]*>)/i', "$1".$metaContentType, $markup); // http://code.google.com/p/phpquery/issues/detail?id=80#c4
 		return $markup;
 	}
 	protected function charsetAppendToHTML($html, $charset, $xhtml = false) {

@@ -162,6 +162,14 @@ function parser_job_form($form, &$form_state, $job) {
     '#default_value' => isset($job->node_language) ? $job->node_language : 'und',
   );
   
+  $form['save_url'] = array(
+    '#type' => 'checkbox',
+    '#title' => 'Сохранять адреса',
+    '#description' => 'Отметьте, если хотите, чтобы у нод были такие же адреса, как на оригинальном сайте.',
+    '#default_value' => isset($job->save_url) && module_exists('path') ? $job->save_url : 0,
+    '#disabled' => !module_exists('path'),
+  );
+  
   $form['fields'] = array(
     '#type' => 'fieldset',
     '#title' => 'Поля',
@@ -350,6 +358,7 @@ function parser_job_form_submit(&$form, &$form_state) {
           trim($values['check_code']),
           $values['node_type'],
           $values['node_language'],
+          $values['save_url'],
           trim($values['node_title_code']),
           $node_fields_code,
           trim($values['node_prepare_code']),
@@ -369,7 +378,7 @@ function parser_job_form_submit(&$form, &$form_state) {
 /**
  * Parse page
  */
-function parser_parse($only_this_domen, $depth, $node_limit, $white_list, $black_list, $check_code, $node_type, $node_language, $node_title_code, $node_fields_code, $node_prepare_code, &$context) {
+function parser_parse($only_this_domen, $depth, $node_limit, $white_list, $black_list, $check_code, $node_type, $node_language, $save_url, $node_title_code, $node_fields_code, $node_prepare_code, &$context) {
   if (empty($context['sandbox'])) {
     $context['sandbox']['progress'] = 0;
     $context['sandbox']['num_created_node'] = 0;
@@ -449,6 +458,14 @@ function parser_parse($only_this_domen, $depth, $node_limit, $white_list, $black
         }
         $function($node, $field_name, $result, $fields, $instances, $node_fields_code, $page_url);
       }
+    }
+    
+    // Set Path alias
+    if ($save_url && !isset($node->path)) {
+      $node->path = array(
+        'alias' => ltrim($parsed_url['path'], '/'),
+        'language' => $node->language,
+      );
     }
     
     node_object_prepare($node);

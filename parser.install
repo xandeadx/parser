@@ -61,6 +61,13 @@ function parser_schema() {
         'type' => 'text',
         'not null' => TRUE,
       ),
+      'save_url' => array(
+        'type' => 'int',
+        'size' => 'tiny',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
       'node_type' => array(
         'type' => 'varchar',
         'length' => 20,
@@ -169,6 +176,7 @@ function parser_install() {
       '}',
     'node_type' => 'article',
     'node_language' => 'und',
+    'save_url' => 0,
     'node_title_code' => 'return $doc->find(\'h1#page-subtitle\')->text();',
     'node_fields_code' => array(
       'body' => '' .
@@ -187,4 +195,17 @@ function parser_install() {
     'node_prepare_code' => '',
   );
   entity_save('parser_job', $job);
+}
+
+/**
+ * Add new col
+ */
+function parser_update_7100() {
+  db_add_field('parser_jobs', 'save_url', array(
+    'type' => 'int',
+    'size' => 'tiny',
+    'unsigned' => TRUE,
+    'not null' => TRUE,
+    'default' => 0,
+  ));
 }

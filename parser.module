@@ -463,7 +463,7 @@ function parser_parse($only_this_domen, $depth, $node_limit, $white_list, $black
     // Set Path alias
     if ($save_url && !isset($node->path)) {
       $node->path = array(
-        'alias' => ltrim($parsed_url['path'], '/'),
+        'alias' => trim($parsed_url['path'], '/'),
         'language' => $node->language,
       );
     }

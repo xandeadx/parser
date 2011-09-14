@@ -165,7 +165,7 @@ function parser_job_form($form, &$form_state, $job) {
   $form['save_url'] = array(
     '#type' => 'checkbox',
     '#title' => 'Сохранять адреса',
-    '#description' => 'Отметьте, если хотите, чтобы у нод были такие же адреса, как на оригинальном сайте.',
+    '#description' => 'Отметьте, если хотите, чтобы у нод были такие же адреса, как на оригинальном сайте. Не включайте эту опцию если на оригинальном сайте не используется ЧПУ (т.е. в адресах есть символ "?")',
     '#default_value' => isset($job->save_url) && module_exists('path') ? $job->save_url : 0,
     '#disabled' => !module_exists('path'),
   );

@@ -910,6 +910,7 @@ function _parser_get_full_url($url, $page_url) {
   }
   
   $url = str_replace(' ', '+', $url);
+  $url = current(explode('#', $url));
   
   return $url;
 }

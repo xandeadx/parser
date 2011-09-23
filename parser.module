@@ -235,7 +235,7 @@ function parser_job_form($form, &$form_state, $job) {
         '#type' => 'textarea',
         '#title' => 'PHP код',
         '#description' => $description,
-        '#default_value' => isset($node_fields_code[$field_name]) ? $node_fields_code[$field_name] : '',
+        '#default_value' => isset($node_fields_code[$field_name]) ? $node_fields_code[$field_name] : '//return $doc->find(\'\')->html();',
         '#rows' => 3,
       ) + $check_button;
 
@@ -550,7 +550,7 @@ function parser_check_code() {
   
   require_once('phpQuery/phpQuery/phpQuery.php');
   $page = _parser_get_page_by_url($_POST['test_url']);
-  $doc = phpQuery::newDocumentHTML($page);
+  $doc = phpQuery::newDocumentHTML($page, 'utf8');
   $result = eval($_POST['field_value']);
   
   echo trim(htmlspecialchars(print_r($result, true)));

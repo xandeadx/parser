@@ -389,10 +389,7 @@ function parser_parse($only_this_domen, $depth, $node_limit, $white_list, $black
   $page_url = $url->url;
   $parsed_url = parse_url($page_url);
   $page = _parser_get_page_by_url($page_url);
-  
-  // Init phpQuery
-  require_once('phpQuery/phpQuery/phpQuery.php');
-  $doc = phpQuery::newDocumentHTML($page);
+  $doc = _parser_create_phpquery($page);
   
   // Find links
   if ($url->depth < $depth) {
@@ -550,7 +547,7 @@ function parser_check_code() {
   
   require_once('phpQuery/phpQuery/phpQuery.php');
   $page = _parser_get_page_by_url($_POST['test_url']);
-  $doc = phpQuery::newDocumentHTML($page, 'utf8');
+  $doc = _parser_create_phpquery($page);
   $result = eval($_POST['field_value']);
   
   echo trim(htmlspecialchars(print_r($result, true)));
@@ -941,4 +938,12 @@ function _parser_clear_vocabulary($vocabulary_name) {
   foreach ($terms as $term) {
     taxonomy_term_delete($term->tid);
   }
+}
+
+/**
+ * Create phpQuery object
+ */
+function _parser_create_phpquery($html) {
+  require_once('phpQuery/phpQuery/phpQuery.php');
+  return phpQuery::newDocumentHTML($html, 'utf8');
 }

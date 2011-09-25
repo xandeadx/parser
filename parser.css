@@ -9,3 +9,14 @@ input.check-button {
 #parser-dialog pre {
   font-size: 12px;
 }
+
+.CodeMirror {
+  border: 1px solid #CCCCCC;
+  border-top-color: #999999;
+  line-height: 140%;
+}
+
+.CodeMirror-scroll {
+  height: auto;
+  min-height: 5em;
+}

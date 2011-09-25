@@ -137,6 +137,7 @@ function parser_job_form($form, &$form_state, $job) {
     '#description' => 'PHP код без тегов &lt;?php и ?&gt;, который должен вернуть TRUE если эту страницу нужно парсить в ноду. Доступные переменные: $page - html код страницы, $doc - объект phpQuery, $page_url - адрес страницы. Пример заполнения: <code>return (bool)$doc->find(\'.node-product\')->length();</code>',
     '#default_value' => isset($job->check_code) ? $job->check_code : '',
     '#rows' => 3,
+    '#resizable' => FALSE,
   ) + $check_button;
   
   $node_types = node_type_get_names();
@@ -187,9 +188,10 @@ function parser_job_form($form, &$form_state, $job) {
     '#type' => 'textarea',
     '#title' => 'title',
     '#description' => 'PHP код, который должен вернуть заголовок ноды. Пример заполнения: <code>return $doc->find(\'h1\')->text();</code>',
-    '#default_value' => isset($job->node_title_code) ? $job->node_title_code : '',
+    '#default_value' => isset($job->node_title_code) ? $job->node_title_code : '//return $doc->find(\'\')->html();',
     '#required' => TRUE,
     '#rows' => 3,
+    '#resizable' => FALSE,
   ) + $check_button;
   
   $form['fields']['node_fields_code'] = array(
@@ -237,6 +239,7 @@ function parser_job_form($form, &$form_state, $job) {
         '#description' => $description,
         '#default_value' => isset($node_fields_code[$field_name]) ? $node_fields_code[$field_name] : '//return $doc->find(\'\')->html();',
         '#rows' => 3,
+        '#resizable' => FALSE,
       ) + $check_button;
 
       if (!empty($instances['node'][$node_type][$field_name]['settings']['text_processing'])) {
@@ -264,6 +267,7 @@ function parser_job_form($form, &$form_state, $job) {
     '#description' => 'Код, который будет выполнен перед вызовом node_save(). Доступные переменные: $node - объект ноды, $page - html код страницы, $doc - объект phpQuery. Пример заполнения: <code>$node->title = \'new title\';</code>',
     '#default_value' => isset($job->node_prepare_code) ? $job->node_prepare_code : '',
     '#rows' => 3,
+    '#resizable' => FALSE,
   );
   
   $form['actions'] = array(
@@ -289,6 +293,7 @@ function parser_job_form($form, &$form_state, $job) {
   
   $parser_path = drupal_get_path('module', 'parser');
   $form['#attached']['library'][] = array('system', 'ui.dialog');
+  $form['#attached']['library'][] = array('parser', 'codemirror');
   $form['#attached']['css'][] = $parser_path . '/parser.css';
   $form['#attached']['js'][] = $parser_path . '/parser.js';
   
@@ -587,6 +592,30 @@ function parser_form_parser_job_overview_form_alter(&$form, $form_state) {
   foreach ($form['table']['#rows'] as &$row) {
     $row[] = l(t('results'), 'admin/structure/parser_jobs/results/' . $row[0]['data']['#name']);
   }
+}
+
+/**
+ * Implements of hook_library().
+ */
+function parser_library() {
+  $parser_path = drupal_get_path('module', 'parser');
+    
+  $libraries['codemirror'] = array(
+    'title' => 'CodeMirror',
+    'website' => 'http://codemirror.net/',
+    'version' => '2.13',
+    'js' => array(
+      $parser_path . '/codemirror2/lib/codemirror.js' => array(),
+      $parser_path . '/codemirror2/mode/clike/clike.js' => array(),
+      $parser_path . '/codemirror2/mode/php/php.js' => array(),
+    ),
+    'css' => array(
+      $parser_path . '/codemirror2/lib/codemirror.css' => array(),
+      $parser_path . '/codemirror2/theme/default.css' => array(),
+    ),
+  );
+
+  return $libraries;
 }
 
 /**

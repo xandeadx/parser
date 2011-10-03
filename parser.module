@@ -60,6 +60,10 @@ function parser_job_load($id) {
   return $result ? reset($result) : FALSE;
 }
 
+function hook_menu_alter() {
+  
+}
+
 /**
  * Menu callback
  */
@@ -555,7 +559,7 @@ function parser_check_code() {
   $doc = _parser_create_phpquery($page);
   $result = eval($_POST['field_value']);
   
-  echo trim(htmlspecialchars(print_r($result, true)));
+  echo print_r($result, true);
 }
 
 /**
@@ -687,9 +691,9 @@ function _parser_get_page_by_url($url) {
   $cached_data = cache_get('parser:' . $url);
   if (!$cached_data) {
     $result = drupal_http_request($url, array('headers' => array('User-Agent' => 'Opera/9.80 (Windows NT 6.1; U; ru) Presto/2.8.131 Version/11.10')));
-    $page = isset($result->data) ? $result->data : '';
+    $page = isset($result->data) ? trim($result->data) : '';
     if ($page) {
-      if (preg_match('#<meta http-equiv="Content-Type" content="text/html; charset=(.+?)"#iU', $page, $matches) && strtolower($matches[1]) != 'utf-8') {
+      if (preg_match('#<meta http-equiv="Content-Type" content="text/html; charset=([^"])"+#iU', $page, $matches) && strtolower($matches[1]) != 'utf-8') {
         $page = iconv($matches[1], 'UTF-8', $page);
         $page = str_ireplace('<meta http-equiv="Content-Type" content="text/html; charset=' . $matches[1] . '"', '<meta http-equiv="Content-Type" content="text/html; charset=utf-8"', $page);
       }

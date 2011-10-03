@@ -6,8 +6,10 @@ input.check-button {
   font-size: .85em !important;
 }
 
-#parser-dialog pre {
+#parser-dialog {
+  font-family: Consolas, Courier New, monospace;
   font-size: 12px;
+  white-space: pre;
 }
 
 .CodeMirror {
@@ -19,4 +21,10 @@ input.check-button {
 .CodeMirror-scroll {
   height: auto;
   min-height: 5em;
+}
+
+.ajax-progress-throbber,
+.ajax-progress-throbber div {
+  float: none;
+  display: inline;
 }

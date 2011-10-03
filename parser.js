@@ -15,7 +15,7 @@
         $('<div id="parser-dialog">Загрузка...</div>').dialog({
           open: function() {
             $.post(Drupal.settings.basePath + 'parser/check', params, function(response) {
-              $('#parser-dialog').html('<pre>' + response + '</pre>');
+              $('#parser-dialog').text(response);
             });
           },
           close: function() {
@@ -33,6 +33,7 @@
         var i = codeMirrors.length;
         codeMirrors[i] = CodeMirror.fromTextArea(this, {
           mode: 'text/x-php',
+          matchBrackets: true,
           onBlur: function() {
             codeMirrors[i].save();
           }

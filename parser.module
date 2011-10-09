@@ -60,10 +60,6 @@ function parser_job_load($id) {
   return $result ? reset($result) : FALSE;
 }
 
-function hook_menu_alter() {
-  
-}
-
 /**
  * Menu callback
  */
@@ -178,7 +174,7 @@ function parser_job_form($form, &$form_state, $job) {
   $form['fields'] = array(
     '#type' => 'fieldset',
     '#title' => 'Поля',
-    '#description' => 'Поля заполняются без обёртки кода в &lt;?php и ?&gt;. Во всех полях доступны две переменные $page - html код страницы, $doc - объект phpQuery.',
+    '#description' => 'Поля заполняются без обёртки кода в &lt;?php и ?&gt;. Во всех полях доступны две переменные $page - html код страницы, $doc - объект phpQuery. Оставьте textarea пустым, если поле заполнять не нужно.',
   );
   
   $form['fields']['node_title_code_fieldset'] = array(
@@ -241,7 +237,7 @@ function parser_job_form($form, &$form_state, $job) {
         '#type' => 'textarea',
         '#title' => 'PHP код',
         '#description' => $description,
-        '#default_value' => isset($node_fields_code[$field_name]) ? $node_fields_code[$field_name] : '//return $doc->find(\'\')->html();',
+        '#default_value' => isset($node_fields_code[$field_name]) ? $node_fields_code[$field_name] : '',
         '#rows' => 3,
         '#resizable' => FALSE,
       ) + $check_button;
@@ -556,6 +552,7 @@ function parser_check_code() {
   
   require_once('phpQuery/phpQuery/phpQuery.php');
   $page = _parser_get_page_by_url($_POST['test_url']);
+  $page_url = $_POST['test_url'];
   $doc = _parser_create_phpquery($page);
   $result = eval($_POST['field_value']);
   

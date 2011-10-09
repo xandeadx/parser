@@ -188,7 +188,7 @@ function parser_job_form($form, &$form_state, $job) {
     '#type' => 'textarea',
     '#title' => 'title',
     '#description' => 'PHP код, который должен вернуть заголовок ноды. Пример заполнения: <code>return $doc->find(\'h1\')->text();</code>',
-    '#default_value' => isset($job->node_title_code) ? $job->node_title_code : '//return $doc->find(\'\')->html();',
+    '#default_value' => isset($job->node_title_code) ? $job->node_title_code : '',
     '#required' => TRUE,
     '#rows' => 3,
     '#resizable' => FALSE,

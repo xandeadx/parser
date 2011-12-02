@@ -68,6 +68,13 @@ function parser_schema() {
         'not null' => TRUE,
         'default' => 0,
       ),
+      'no_update_nodes' => array(
+        'type' => 'int',
+        'size' => 'tiny',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
       'site_charset' => array(
         'type' => 'varchar',
         'length' => 20,
@@ -184,6 +191,7 @@ function parser_install() {
     'node_type' => 'article',
     'node_language' => 'und',
     'save_url' => 0,
+    'no_update_nodes' => 0,
     'node_title_code' => 'return $doc->find(\'h1#page-subtitle\')->text();',
     'node_fields_code' => array(
       'body' => '' .
@@ -228,3 +236,17 @@ function parser_update_7101() {
     'default' => 'auto',
   ));
 }
+
+/**
+ * Add new col
+ */
+function parser_update_7102() {
+  db_add_field('parser_jobs', 'no_update_nodes', array(
+    'type' => 'int',
+    'size' => 'tiny',
+    'unsigned' => TRUE,
+    'not null' => TRUE,
+    'default' => 0,
+  ));
+}
+

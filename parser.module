@@ -178,6 +178,13 @@ function parser_job_form($form, &$form_state, $job) {
     '#disabled' => !module_exists('path'),
   );
   
+  $form['no_update_nodes'] = array(
+    '#type' => 'checkbox',
+    '#title' => 'Не обновлять ноды',
+    '#description' => 'Отметьте, если не хотите обновлять ноды, созданные в предыдущие запуски этого задания',
+    '#default_value' => isset($job->no_update_nodes) ? $job->no_update_nodes : 0,
+  );
+  
   $form['fields'] = array(
     '#type' => 'fieldset',
     '#title' => 'Поля',
@@ -253,7 +260,7 @@ function parser_job_form($form, &$form_state, $job) {
         $form['fields']['node_fields_code'][$fieldset_name][$field_name . '_format'] = array(
           '#type' => 'select',
           '#title' => 'Формат текста',
-          '#description' => 'Формат текста, который будет установлен для поля выше.',
+          '#description' => 'Формат текста, который будет установлен для поля.',
           '#options' => $format_options,
           '#default_value' => isset($node_fields_code[$field_name . '_format']) ? $node_fields_code[$field_name . '_format'] : '',
         );
@@ -372,6 +379,7 @@ function parser_job_form_submit(&$form, &$form_state) {
           $values['node_type'],
           $values['node_language'],
           $values['save_url'],
+          $values['no_update_nodes'],
           trim($values['node_title_code']),
           $node_fields_code,
           trim($values['node_prepare_code']),
@@ -391,22 +399,7 @@ function parser_job_form_submit(&$form, &$form_state) {
 /**
  * Parse page
  */
-function parser_parse(
-  $only_this_domen,
-  $depth,
-  $node_limit,
-  $white_list,
-  $black_list,
-  $check_code,
-  $site_charset,
-  $node_type,
-  $node_language,
-  $save_url,
-  $node_title_code,
-  $node_fields_code,
-  $node_prepare_code,
-  &$context) {
-
+function parser_parse($only_this_domen, $depth, $node_limit, $white_list, $black_list, $check_code, $site_charset, $node_type, $node_language, $save_url, $no_update_nodes, $node_title_code, $node_fields_code, $node_prepare_code, &$context) {
   if (empty($context['sandbox'])) {
     $context['sandbox']['progress'] = 0;
     $context['sandbox']['num_created_node'] = 0;
@@ -416,6 +409,7 @@ function parser_parse(
   $url = _parser_url_get_not_parsed();
   $page_url = $url->url;
   $parsed_url = parse_url($page_url);
+  $nid = _parser_get_nid_by_url($page_url);
   $page = _parser_get_page_by_url($page_url, $site_charset);
   $doc = _parser_create_phpquery($page);
   
@@ -452,13 +446,15 @@ function parser_parse(
   if ($allowed_parse && $check_code) {
     $allowed_parse = eval($check_code);
   }
+  if ($allowed_parse && $no_update_nodes && $nid) {
+    $allowed_parse = FALSE;
+  }
   
   // Parse page
   if ($allowed_parse) {
     $fields = field_info_fields();
     $instances = field_info_instances();
     
-    $nid = _parser_get_nid_by_url($page_url);
     if ($nid) {
       $node = node_load($nid);
     }
@@ -580,10 +576,6 @@ function parser_check_code() {
   $page_url = $_POST['test_url'];
   $doc = _parser_create_phpquery($page);
   $result = eval($_POST['field_value']);
-  
-  if (is_string($result)) {
-    $result = trim($result);
-  }
   
   echo print_r($result, true);
 }
@@ -718,7 +710,7 @@ function _parser_get_page_by_url($url, $charset = 'auto', $skip_cache = FALSE) {
   $cached_data = cache_get($cid);
   if (!$cached_data || $skip_cache) {
     $result = drupal_http_request($url, array('headers' => array('User-Agent' => 'Opera/9.80 (Windows NT 6.1; U; ru) Presto/2.8.131 Version/11.10')));
-    $page = isset($result->data) ? trim($result->data) : ''; //echo iconv('WINDOWS-1251', 'UTF-8', $page);
+    $page = isset($result->data) ? trim($result->data) : '';
     if ($page) {
       if ($charset == 'auto') {
         if (preg_match('#<meta http-equiv="Content-Type" content="text/html; charset=([^"])"+#iU', $page, $matches) && strtolower($matches[1]) != 'utf-8') {

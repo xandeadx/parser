@@ -16,7 +16,7 @@
         $('<div id="parser-dialog">Загрузка...</div>').dialog({
           open: function() {
             $.post(Drupal.settings.basePath + 'parser/check', params, function(response) {
-              $('#parser-dialog').text(response);
+              $('#parser-dialog').text($.trim(response));
             });
           },
           close: function() {

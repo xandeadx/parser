@@ -190,8 +190,7 @@ function parser_job_form($form, &$form_state, $job) {
     '#title' => 'Поля',
     '#description' => '
       <p>Поля заполняются без обёртки кода в &lt;?php и ?&gt;. Во всех полях доступны две переменные $page - html код страницы, $doc - объект phpQuery. Оставьте textarea пустым, если поле заполнять не нужно.<p>
-      <p>Если появляются проблемы с кодировкой, то попробуйте сменить значение в поле <i>Кодировка сайта</i> или используйте функцию iconv(), для ручной конвертации. Например:<br />
-      <code style="font-size:.9em;">return iconv(\'WINDOWS-1251\', \'UTF-8\', $doc->find(\'selector\')->text());</code></p>
+      <p>Если появляются проблемы с кодировкой, то попробуйте сменить значение в поле <i>Кодировка сайта</i> или используйте функцию <a href="http://www.php.net/manual/ru/function.iconv.php" target="_blank">iconv()</a>, для ручной конвертации текста. Например: <code style="font-size:.9em;">return iconv(\'WINDOWS-1251\', \'UTF-8\', $doc->find(\'selector\')->text());</code></p>
     ',
   );
   

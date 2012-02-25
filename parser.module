@@ -737,7 +737,7 @@ function _parser_get_page_by_url($url, $charset = 'auto', $skip_cache = FALSE) {
  * Attach field to node object
  */
 function _parser_add_field(&$node, $field_name, $field_value, $fields, $instances, $node_fields_code, $page_url) {
-  $node->{$field_name}[$node->language] = $field_value;
+  $node->{$field_name}[LANGUAGE_NONE] = $field_value;
 }
 
 /**
@@ -753,10 +753,10 @@ function _parser_add_field_text(&$node, $field_name, $field_values, $fields, $in
   
   $i = 0;
   foreach ($field_values as $field_value) {
-    $node->{$field_name}[$node->language][$i]['value'] = $field_value;
+    $node->{$field_name}[LANGUAGE_NONE][$i]['value'] = $field_value;
   
     if ($instances['node'][$node->type][$field_name]['settings']['text_processing']) {
-      $node->{$field_name}[$node->language][$i]['format'] = $node_fields_code[$field_name . '_format'];
+      $node->{$field_name}[LANGUAGE_NONE][$i]['format'] = $node_fields_code[$field_name . '_format'];
     }
     
     $i++;
@@ -800,9 +800,9 @@ function _parser_add_field_file(&$node, $field_name, $field_values, $fields, $in
     }
     
     // If file already attached, then break current iteration
-    if (isset($node->{$field_name}[$node->language])) {
+    if (isset($node->{$field_name}[LANGUAGE_NONE])) {
       $cur_file_already_attached = FALSE;
-      foreach ($node->{$field_name}[$node->language] as $old_file) {
+      foreach ($node->{$field_name}[LANGUAGE_NONE] as $old_file) {
         if ($old_file['filename'] == $file_name) {
           $files[] = $old_file;
           $cur_file_already_attached = TRUE;
@@ -845,7 +845,7 @@ function _parser_add_field_file(&$node, $field_name, $field_values, $fields, $in
     unset($node->{$field_name});
   }
   
-  $node->{$field_name}[$node->language] = $files;
+  $node->{$field_name}[LANGUAGE_NONE] = $files;
 }
 
 /**
@@ -876,7 +876,7 @@ function _parser_add_field_taxonomy_term_reference(&$node, $field_name, $field_v
       $term = (object)array('vid' => $voc->vid, 'name' => $term_name);
       taxonomy_term_save($term);
     }
-    $node->{$field_name}[$node->language][]['tid'] = $term->tid;
+    $node->{$field_name}[LANGUAGE_NONE][]['tid'] = $term->tid;
   }
 }
 
@@ -891,7 +891,7 @@ function _parser_add_field_number_integer(&$node, $field_name, $field_values, $f
     unset($node->{$field_name});
   }
   foreach ($field_values as $field_value) {
-    $node->{$field_name}[$node->language][]['value'] = (int)$field_value;
+    $node->{$field_name}[LANGUAGE_NONE][]['value'] = (int)$field_value;
   }
 }
 

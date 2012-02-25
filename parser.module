@@ -92,7 +92,7 @@ function parser_job_form($form, &$form_state, $job) {
   $form['test_url'] = array(
     '#type' => 'textfield',
     '#title' => 'URL тестовой страницы',
-    '#description' => 'Адрес любой страницы, которая будет использоваться для проверки работоспособности кода.',
+    '#description' => 'Адрес любой страницы, попадающей под условие парсинга, которая будет использоваться для проверки работоспособности кода.',
     '#required' => TRUE,
     '#default_value' => isset($job->test_url) ? $job->test_url : '',
   );
@@ -100,7 +100,7 @@ function parser_job_form($form, &$form_state, $job) {
   $form['depth'] = array(
     '#type' => 'textfield',
     '#title' => 'Глубина',
-    '#description' => 'Глубина, на которую парсер будет ходить по ссылкам. Например 1 означает, что будет распарсен стартовый адрес и страницы на которые он ссылается.',
+    '#description' => 'Глубина, на которую парсер будет ходить по ссылкам. Например 1 означает, что будет распарсен стартовый адрес и страницы на которые он ссылается, т.е. парсер пройдёт вглубь на 1 уровень относительно стартовой страницы.',
     '#required' => TRUE,
     '#default_value' => isset($job->depth) ? $job->depth : 1,
     '#size' => 5,
@@ -134,7 +134,7 @@ function parser_job_form($form, &$form_state, $job) {
   $form['check_code'] = array(
     '#type' => 'textarea',
     '#title' => 'Код проверки для дальнейшего парсинга страницы',
-    '#description' => 'PHP код без тегов &lt;?php и ?&gt;, который должен вернуть TRUE если эту страницу нужно парсить в ноду. Доступные переменные: $page - html код страницы, $doc - объект phpQuery, $page_url - адрес страницы. Пример заполнения: <code>return (bool)$doc->find(\'.node-product\')->length();</code>',
+    '#description' => 'PHP код без тегов &lt;?php и ?&gt;, который должен вернуть TRUE если страницу нужно парсить в ноду. Доступные переменные: $page - html код страницы, $doc - объект phpQuery, $page_url - адрес страницы. Пример заполнения: <code>return (bool)$doc->find(\'.node-product\')->length();</code>',
     '#default_value' => isset($job->check_code) ? $job->check_code : '',
     '#rows' => 3,
     '#resizable' => FALSE,
@@ -143,7 +143,7 @@ function parser_job_form($form, &$form_state, $job) {
   $form['site_charset'] = array(
     '#type' => 'select',
     '#title' => 'Кодировка сайта',
-    '#description' => 'Выберите кодировку, которая используется на сайте. Рекомендуется атоопределение.',
+    '#description' => 'Выберите кодировку, которая используется на сайте. Рекомендуется автоопределение.',
     '#options' => array('auto' => 'Автоопределение', 'UTF-8' => 'UTF-8', 'WINDOWS-1251' => 'WINDOWS-1251'),
     '#default_value' => isset($job->site_charset) ? $job->site_charset : 'auto',
   );
@@ -188,7 +188,11 @@ function parser_job_form($form, &$form_state, $job) {
   $form['fields'] = array(
     '#type' => 'fieldset',
     '#title' => 'Поля',
-    '#description' => 'Поля заполняются без обёртки кода в &lt;?php и ?&gt;. Во всех полях доступны две переменные $page - html код страницы, $doc - объект phpQuery. Оставьте textarea пустым, если поле заполнять не нужно.',
+    '#description' => '
+      <p>Поля заполняются без обёртки кода в &lt;?php и ?&gt;. Во всех полях доступны две переменные $page - html код страницы, $doc - объект phpQuery. Оставьте textarea пустым, если поле заполнять не нужно.<p>
+      <p>Если появляются проблемы с кодировкой, то попробуйте сменить значение в поле <i>Кодировка сайта</i> или используйте функцию iconv(), для ручной конвертации. Например:<br />
+      <code style="font-size:.9em;">return iconv(\'WINDOWS-1251\', \'UTF-8\', $doc->find(\'selector\')->text());</code></p>
+    ',
   );
   
   $form['fields']['node_title_code_fieldset'] = array(

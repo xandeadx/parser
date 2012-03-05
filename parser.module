@@ -471,6 +471,11 @@ function parser_parse($job, &$context) {
     foreach ($job->node_fields_code as $field_name => $php_code) {
       if (isset($fields[$field_name])) {
         $result = eval($php_code);
+        
+        if (!$node) {
+          break;
+        }
+        
         $function = '_parser_add_field_' . $fields[$field_name]['type'];
         if (!function_exists($function)) {
           $function = '_parser_add_field';
@@ -479,25 +484,27 @@ function parser_parse($job, &$context) {
       }
     }
     
-    // Set Path alias
-    if ($job->save_url && !isset($node->path)) {
-      $node->path = array(
-        'alias' => trim($parsed_url['path'], '/'),
-        'language' => $node->language,
-      );
-    }
+    if ($node) {
+      // Set Path alias
+      if ($job->save_url && !isset($node->path)) {
+        $node->path = array(
+          'alias' => trim($parsed_url['path'], '/'),
+          'language' => $node->language,
+        );
+      }
     
-    node_object_prepare($node);
-    if ($job->node_prepare_code) {
-      eval($job->node_prepare_code);
+      node_object_prepare($node);
+      if ($job->node_prepare_code) {
+        eval($job->node_prepare_code);
+      }
+      node_save($node);
+      
+      if (!$nid) {
+        _parser_node_add($job->id, $node->nid, $page_url);
+      }
+      
+      $context['sandbox']['num_created_node']++;
     }
-    node_save($node);
-    
-    if (!$nid) {
-      _parser_node_add($job->id, $node->nid, $page_url);
-    }
-    
-    $context['sandbox']['num_created_node']++;
   }
   
   _parser_url_mark_parsed($page_url);

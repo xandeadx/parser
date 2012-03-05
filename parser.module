@@ -506,7 +506,7 @@ function parser_parse($job, &$context) {
   $context['sandbox']['max'] = _parser_url_count();
   $context['sandbox']['progress']++;
   $context['message'] = 'Завершён парсинг страницы <em>' . $page_url . '</em> с глубиной ' . $url->depth . '<br />';
-  $context['message'] .= 'Страниц в очереди: ' . ($context['sandbox']['max'] - $context['sandbox']['num_created_node']) . '<br />';
+  $context['message'] .= 'Страниц в очереди: ' . ($context['sandbox']['max'] - $context['sandbox']['progress']) . '<br />';
   $context['message'] .= 'Создано нод: ' . $context['results']['created_nodes'] . '<br />';
   $context['message'] .= 'Обновлено нод: ' . $context['results']['updated_nodes'] . '<br />';
   $context['message'] .= 'Скачано страниц: ' . $context['results']['pages_from_http'] . '<br />';
@@ -531,6 +531,7 @@ function parser_finished($success, $results, $operations) {
     Обработано страниц: ' . _parser_url_count(TRUE) . '.
     Создано нод: ' . l($results['created_nodes'], 'admin/structure/parser_jobs/results/' . $results['jid']) . '.
     Обновлено нод: ' . l($results['updated_nodes'], 'admin/structure/parser_jobs/results/' . $results['jid']) . '.
+    Скачано файлов: ' . $results['downloaded_files'] . '
     Затрачено времени: ' . gmdate('H:i:s', time() - $results['time_start']) . '.
     ' . l('Посмотреть системный журнал', 'admin/reports/dblog') . '
   ');

@@ -81,6 +81,13 @@ function parser_schema() {
         'not null' => TRUE,
         'default' => 'auto',
       ),
+      'site_charset_fix' => array(
+        'type' => 'int',
+        'size' => 'tiny',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
       'node_type' => array(
         'type' => 'varchar',
         'length' => 20,
@@ -122,6 +129,7 @@ function parser_schema() {
     ),
     'primary key' => array('id'),
   );
+  
   $schema['parser_urls'] = array(
     'fields' => array(
       'url' => array(
@@ -145,8 +153,15 @@ function parser_schema() {
       ),
     ),
   );
+  
   $schema['parser_nodes'] = array(
     'fields' => array(
+      'jid' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
       'nid' => array(
         'type' => 'int',
         'unsigned' => TRUE,
@@ -159,9 +174,6 @@ function parser_schema() {
         'not null' => TRUE,
         'default' => '',
       ),
-    ),
-    'unique keys' => array(
-      'nid' => array('nid'),
     ),
   );
   return $schema;
@@ -188,6 +200,7 @@ function parser_install() {
       '  return TRUE;' . "\n" .
       '}',
     'site_charset' => 'auto',
+    'site_charset_fix' => 0,
     'node_type' => 'article',
     'node_language' => 'und',
     'save_url' => 0,
@@ -244,6 +257,33 @@ function parser_update_7102() {
   db_add_field('parser_jobs', 'no_update_nodes', array(
     'type' => 'int',
     'size' => 'tiny',
+    'unsigned' => TRUE,
+    'not null' => TRUE,
+    'default' => 0,
+  ));
+}
+
+/**
+ * Add new col
+ */
+function parser_update_7103() {
+  db_add_field('parser_jobs', 'site_charset_fix', array(
+    'type' => 'int',
+    'size' => 'tiny',
+    'unsigned' => TRUE,
+    'not null' => TRUE,
+    'default' => 0,
+  ));
+}
+
+/**
+ * Add new col
+ */
+function parser_update_7104() {
+  db_drop_unique_key('parser_nodes', 'nid');
+  
+  db_add_field('parser_nodes', 'jid', array(
+    'type' => 'int',
     'unsigned' => TRUE,
     'not null' => TRUE,
     'default' => 0,

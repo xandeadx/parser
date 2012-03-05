@@ -381,10 +381,6 @@ function parser_job_form_submit(&$form, &$form_state) {
     );
 
     batch_set($batch);
-    cache_set('parser_job_info', array(
-      'job_id' => $job->id,
-      'start' => time(),
-    ));
   }
 }
 
@@ -395,6 +391,10 @@ function parser_parse($job, &$context) {
   if (empty($context['sandbox'])) {
     $context['sandbox']['progress'] = 0;
     $context['sandbox']['num_created_node'] = 0;
+    $context['results']['jid'] = $job->id;
+    $context['results']['time_start'] = time();
+    $context['results']['created_nodes'] = 0;
+    $context['results']['updated_nodes'] = 0;
   }
   
   // Parsing -----------------------------------------------------------------------------------------------------------
@@ -449,11 +449,13 @@ function parser_parse($job, &$context) {
     
     if ($nid) {
       $node = node_load($nid);
+      $context['results']['updated_nodes']++;
     }
     else {
       $node = new stdClass();
       $node->type = $job->node_type;
       $node->language = $job->node_language;
+      $context['results']['created_nodes']++;
     }
     
     $node->title = eval($job->node_title_code);
@@ -492,7 +494,6 @@ function parser_parse($job, &$context) {
     }
     
     $context['sandbox']['num_created_node']++;
-    $context['results'][] = $node->title;
   }
   
   _parser_url_mark_parsed($page_url);
@@ -516,12 +517,12 @@ function parser_parse($job, &$context) {
  */
 function parser_finished($success, $results, $operations) {
   if ($success) {
-    $cache = cache_get('parser_job_info');
     $message = '
       Парсинг закончен.
       Обработано страниц: ' . _parser_url_count(TRUE) . '.
-      Создано/обновлено нод: ' . l(count($results), 'admin/structure/parser_jobs/results/' . $cache->data['job_id']) . '.
-      Затрачено времени: ' . gmdate('H:i:s', time() - $cache->data['start']) . '.
+      Создано нод: ' . l($results['created_nodes'], 'admin/structure/parser_jobs/results/' . $results['jid']) . '.
+      Обновлено нод: ' . l($results['updated_nodes'], 'admin/structure/parser_jobs/results/' . $results['jid']) . '.
+      Затрачено времени: ' . gmdate('H:i:s', time() - $results['time_start']) . '.
     ';
     drupal_set_message($message . l('Посмотреть системный журнал', 'admin/reports/dblog'));
   }
@@ -802,8 +803,8 @@ function _parser_add_field_file(&$node, $field_name, $field_values, $fields, $in
     if (!$field_value) {
       continue;
     }
-      
-    $file_name = basename($field_value);
+    
+    $file_name = drupal_basename($field_value);
     if (function_exists('transliteration_clean_filename')) {
       $file_name = transliteration_clean_filename($file_name, $node->language);
     }
@@ -826,15 +827,16 @@ function _parser_add_field_file(&$node, $field_name, $field_values, $fields, $in
       }
     }
     
+    $file_url = _parser_get_full_url($field_value, $page_url);
+    
     // Validate by extensions
     $allowed_file_extensions = str_replace(' ', '|', $field_settings['file_extensions']);
     if (!preg_match('#\.(' . $allowed_file_extensions . ')$#i', $file_name)) {
-      watchdog('parser', 'Файл ' . check_plain($field_value) . ' закачан не будет, так как его тип не в списке допустимых.');
+      watchdog('parser', 'Файл <i>' . check_plain($file_url) . '</i> закачан не будет, так как его тип не в списке допустимых.');
       continue;
     }
     
     // Save remote file to server
-    $file_url = _parser_get_full_url($field_value, $page_url);
     $result = drupal_http_request($file_url);
 
     if (!empty($result->error)) {

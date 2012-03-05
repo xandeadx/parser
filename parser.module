@@ -243,6 +243,7 @@ function parser_job_form($form, &$form_state, $job) {
     'taxonomy_term_reference' => 'PHP код, который должен вернуть название термина, либо массив названий. Отсутствующие термины будут созданы автоматически. Пример заполнения:<br /><code>$terms = array();<br />foreach ($doc->find(\'.tags li\') as $li) $terms[] = pq($li)->text();<br />return $terms;</code>',
     'text_with_summary'       => 'PHP код, который должен вернуть значение поля. Пример заполнения: <code>return $doc->find(\'article.content\')->html();</code>',
     'list_text'               => 'PHP код, который должен вернуть либо ключ из списка допустимых значений, либо подпись. Если значения нет в списке допустимых, то оно будет проигнорированно. Пример заполнения: <code>return $doc->find(\'selector\')->text();</code>',
+    'node_reference'          => 'PHP код, который должен вернуть либо nid материала, либо его заголовок (не рекомендуется).',
   );
   
   foreach ($fields as $field_name => $field) {
@@ -931,6 +932,8 @@ function _parser_add_field_list_text(&$node, $field_name, $field_values, $fields
 
   $allowed_values = $fields[$field_name]['settings']['allowed_values'];
   foreach ($field_values as $field_value) {
+    $field_value = trim($field_value);
+    
     if (!isset($allowed_values[$field_value])) {
       $key = array_search($field_value, $allowed_values, TRUE);
       if ($key !== FALSE) {
@@ -960,6 +963,12 @@ function _parser_add_field_node_reference(&$node, $field_name, $field_values, $f
     if (is_numeric($field_value)) {
       $node->{$field_name}[LANGUAGE_NONE][]['nid'] = $field_value;
     }
+    else {
+      $nid = _parser_get_nid_by_title(trim($field_value));
+      if ($nid) {
+        $node->{$field_name}[LANGUAGE_NONE][]['nid'] = $nid;
+      }
+    }
   }
 }
 
@@ -982,6 +991,18 @@ function _parser_get_nid_by_url($url, $jid) {
     ->fields('pn', array('nid'))
     ->condition('url', $url)
     ->condition('jid', $jid)
+    ->execute()
+    ->fetchField();
+}
+
+/**
+ * Return nid by Node Title
+ */
+function _parser_get_nid_by_title($title) {
+  return db_select('node', 'n')
+    ->fields('n', array('nid'))
+    ->condition('title', $title)
+    ->range(0, 1)
     ->execute()
     ->fetchField();
 }

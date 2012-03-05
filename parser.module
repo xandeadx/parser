@@ -512,6 +512,7 @@ function parser_parse($job, &$context) {
   $context['message'] .= 'Скачано страниц: ' . $context['results']['pages_from_http'] . '<br />';
   $context['message'] .= 'Страниц взято из кэша: ' . $context['results']['pages_from_cache'] . '<br />';
   $context['message'] .= 'Скачано файлов: ' . $context['results']['downloaded_files'] . '<br />';
+  $context['message'] .= 'Затраченное время: ' . gmdate('H:i:s', time() - $context['results']['time_start']) . '<br />';
 
   if ($job->node_limit && $context['sandbox']['num_created_node'] >= $job->node_limit) {
     $context['finished'] = 1;

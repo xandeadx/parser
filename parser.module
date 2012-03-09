@@ -82,13 +82,6 @@ function parser_job_form($form, &$form_state, $job) {
     '#default_value' => isset($job->start_url) ? $job->start_url : '',
   );
   
-  $form['only_this_domen'] = array(
-    '#type' => 'checkbox',
-    '#title' => 'Парсить только с этого же домена',
-    '#description' => 'Отметьте, если хотите чтобы парсер работал только на указанном выше домене.',
-    '#default_value' => isset($job->only_this_domen) ? $job->only_this_domen : TRUE,
-  );
-  
   $form['test_url'] = array(
     '#type' => 'textfield',
     '#title' => 'URL тестовой страницы',
@@ -103,15 +96,6 @@ function parser_job_form($form, &$form_state, $job) {
     '#description' => 'Глубина, на которую парсер будет ходить по ссылкам. Например 1 означает, что будет распарсен стартовый адрес и страницы на которые он ссылается, т.е. парсер пройдёт вглубь на 1 уровень относительно стартовой страницы.',
     '#required' => TRUE,
     '#default_value' => isset($job->depth) ? $job->depth : 1,
-    '#size' => 5,
-  );
-  
-  $form['node_limit'] = array(
-    '#type' => 'textfield',
-    '#title' => 'Ограничить число нод',
-    '#description' => 'Введите максимальное число нод, которое сможет создать парсер. Укажите 0 если ограничения не нужны.',
-    '#required' => TRUE,
-    '#default_value' => isset($job->node_limit) ? $job->node_limit : 0,
     '#size' => 5,
   );
   
@@ -140,21 +124,6 @@ function parser_job_form($form, &$form_state, $job) {
     '#resizable' => FALSE,
   ) + $check_button;
   
-  $form['site_charset'] = array(
-    '#type' => 'select',
-    '#title' => 'Кодировка сайта',
-    '#description' => 'Выберите кодировку, которая используется на сайте. Рекомендуется автоопределение.',
-    '#options' => array('auto' => 'Автоопределение', 'UTF-8' => 'UTF-8', 'WINDOWS-1251' => 'WINDOWS-1251'),
-    '#default_value' => isset($job->site_charset) ? $job->site_charset : 'auto',
-  );
-  
-  $form['site_charset_fix'] = array(
-    '#type' => 'checkbox',
-    '#title' => 'Передавать кодировку в конструктор phpQuery',
-    '#description' => 'Отметьте эту опцию, если возникают проблемы с кодировкой. Костыль для phpQuery.',
-    '#default_value' => isset($job->site_charset_fix) ? $job->site_charset_fix : FALSE,
-  );
-  
   $node_types = node_type_get_names();
   $form['node_type'] = array(
     '#type' => 'select',
@@ -167,29 +136,6 @@ function parser_job_form($form, &$form_state, $job) {
       'callback' => 'parser_job_form_fields',
       'wrapper' => 'node-fields-code',
     ),
-  );
-  
-  $form['node_language'] = array(
-    '#type' => 'select',
-    '#title' => 'Язык материала',
-    '#description' => 'Язык материала и полей.',
-    '#options' => drupal_map_assoc(field_content_languages()),
-    '#default_value' => isset($job->node_language) ? $job->node_language : 'und',
-  );
-  
-  $form['save_url'] = array(
-    '#type' => 'checkbox',
-    '#title' => 'Сохранять адреса',
-    '#description' => 'Отметьте, если хотите, чтобы у нод были такие же адреса, как на оригинальном сайте. Не включайте эту опцию если на оригинальном сайте не используется ЧПУ (т.е. в адресах есть символ "?")',
-    '#default_value' => isset($job->save_url) && module_exists('path') ? $job->save_url : 0,
-    '#disabled' => !module_exists('path'),
-  );
-  
-  $form['no_update_nodes'] = array(
-    '#type' => 'checkbox',
-    '#title' => 'Не обновлять ноды',
-    '#description' => 'Отметьте, если не хотите обновлять ноды, созданные в предыдущие запуски этого задания',
-    '#default_value' => isset($job->no_update_nodes) ? $job->no_update_nodes : 0,
   );
   
   $form['fields'] = array(
@@ -287,7 +233,67 @@ function parser_job_form($form, &$form_state, $job) {
     }
   }
   
-  $form['node_prepare_code'] = array(
+  $form['advanced_settings'] = array(
+    '#type' => 'fieldset',
+    '#title' => 'Дополнительные настройки',
+    '#collapsible' => TRUE,
+    '#collapsed' => TRUE,
+  );
+  
+  $form['advanced_settings']['node_limit'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Ограничить число нод',
+    '#description' => 'Максимальное число нод, которое сможет создать парсер. Применяется для тестирования. Оставьте пустым, если ограничения не нужны.',
+    '#default_value' => !empty($job->node_limit) ? $job->node_limit : '',
+    '#size' => 5,
+  );
+  
+  $form['advanced_settings']['site_charset'] = array(
+    '#type' => 'select',
+    '#title' => 'Кодировка сайта',
+    '#description' => 'Выберите кодировку, которая используется на сайте. Рекомендуется автоопределение.',
+    '#options' => array('auto' => 'Автоопределение', 'UTF-8' => 'UTF-8', 'WINDOWS-1251' => 'WINDOWS-1251'),
+    '#default_value' => isset($job->site_charset) ? $job->site_charset : 'auto',
+  );
+  
+  $form['advanced_settings']['site_charset_fix'] = array(
+    '#type' => 'checkbox',
+    '#title' => 'Передавать кодировку в конструктор phpQuery',
+    '#description' => 'Отметьте эту опцию, если возникают проблемы с кодировкой. Костыль для phpQuery.',
+    '#default_value' => isset($job->site_charset_fix) ? $job->site_charset_fix : FALSE,
+  );
+  
+  $form['advanced_settings']['only_this_domen'] = array(
+    '#type' => 'checkbox',
+    '#title' => 'Парсить только с этого же домена',
+    '#description' => 'Отметьте, если хотите чтобы парсер работал только на домене, указанном в поле "Стартовый URL".',
+    '#default_value' => isset($job->only_this_domen) ? $job->only_this_domen : TRUE,
+  );
+  
+  $form['advanced_settings']['save_url'] = array(
+    '#type' => 'checkbox',
+    '#title' => 'Сохранять адреса',
+    '#description' => 'Отметьте, если хотите, чтобы у нод были такие же адреса, как на оригинальном сайте. Не включайте эту опцию если на оригинальном сайте не используется ЧПУ (т.е. в адресах есть символ "?")',
+    '#default_value' => isset($job->save_url) && module_exists('path') ? $job->save_url : 0,
+    '#disabled' => !module_exists('path'),
+  );
+  
+  $form['advanced_settings']['no_update_nodes'] = array(
+    '#type' => 'checkbox',
+    '#title' => 'Не обновлять ноды',
+    '#description' => 'Отметьте, если не хотите обновлять ноды, созданные в предыдущие запуски этого задания',
+    '#default_value' => isset($job->no_update_nodes) ? $job->no_update_nodes : 0,
+  );
+  
+  $form['advanced_settings']['node_language'] = array(
+    '#type' => 'select',
+    '#title' => 'Язык материала',
+    '#description' => 'Язык материалов ($node->language). Выберите "und" если не знаете зачем это нужно.',
+    '#options' => drupal_map_assoc(field_content_languages()),
+    '#default_value' => isset($job->node_language) ? $job->node_language : 'und',
+  );
+  
+  $form['advanced_settings']['node_prepare_code'] = array(
     '#type' => 'textarea',
     '#title' => 'Пост обработка ноды',
     '#description' => 'Код, который будет выполнен перед вызовом node_save(). Доступные переменные: $node - объект ноды, $page - html код страницы, $doc - объект phpQuery. Пример заполнения: <code>$node->title = \'new title\';</code>',
@@ -344,6 +350,10 @@ function parser_job_form_submit(&$form, &$form_state) {
   }
   $node_fields_code = array_diff($node_fields_code, array(''));
   $form_state['values']['node_fields_code'] = $node_fields_code;
+  
+  if (!is_int($form_state['values']['node_limit'])) {
+    $form_state['values']['node_limit'] = 0;
+  }
   
   $job = entity_ui_form_submit_build_entity($form, $form_state);
   

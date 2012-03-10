@@ -118,7 +118,12 @@ function parser_job_form($form, &$form_state, $job) {
   $form['check_code'] = array(
     '#type' => 'textarea',
     '#title' => 'Код проверки для дальнейшего парсинга страницы',
-    '#description' => 'PHP код без тегов &lt;?php и ?&gt;, который должен вернуть TRUE если страницу нужно парсить в ноду. Доступные переменные: $page - html код страницы, $doc - объект phpQuery, $page_url - адрес страницы. Пример заполнения: <code>return (bool)$doc->find(\'.node-product\')->length();</code>',
+    '#description' => '
+      PHP код без тегов &lt;?php и ?&gt;, который должен вернуть TRUE если страницу нужно парсить в ноду. Доступные переменные: $page - html код страницы, $doc - объект phpQuery, $page_url -
+      адрес страницы без учёта редиректов. Пример заполнения: <code>return (bool)$doc->find(\'.node-product\')->length();</code><br />
+      Если возвращаемое значение будет числом или строкой, то оно будет расценено как идентификатор распарсиваемой страницы (аналог nid). Этот идентификатор будет сохранён в бд и позволит
+      избежать дублей материалов, которые доступны по нескольким URL.
+    ',
     '#default_value' => isset($job->check_code) ? $job->check_code : '',
     '#rows' => 3,
     '#resizable' => FALSE,
@@ -142,8 +147,10 @@ function parser_job_form($form, &$form_state, $job) {
     '#type' => 'fieldset',
     '#title' => 'Поля',
     '#description' => '
-      <p>Поля заполняются без обёртки кода в &lt;?php и ?&gt;. Во всех полях доступны две переменные $page - html код страницы, $doc - объект phpQuery. Оставьте textarea пустым, если поле заполнять не нужно.<p>
-      <p>Если появляются проблемы с кодировкой, то попробуйте сменить значение в поле <i>Кодировка сайта</i>, либо включите опцию <i>Передовать кодировку в конструктор phpQuery</i>, либо используйте функцию <a href="http://www.php.net/manual/ru/function.iconv.php" target="_blank">iconv()</a>, для ручной конвертации текста. Например: <code style="font-size:.9em;">return iconv(\'WINDOWS-1251\', \'UTF-8\', $doc->find(\'selector\')->text());</code></p>
+      <p>Поля заполняются без обёртки кода в &lt;?php и ?&gt;. Во всех полях доступны две переменные $doc - объект phpQuery, $page - html код страницы, $page_url - адрес страницы без учёта
+      редиректов. Оставьте textarea пустым, если поле заполнять не нужно.<p><p>Если появляются проблемы с кодировкой, то попробуйте сменить значение в поле <i>Кодировка сайта</i>, либо включите
+      опцию <i>Передовать кодировку в конструктор phpQuery</i>, либо используйте функцию <a href="http://www.php.net/manual/ru/function.iconv.php" target="_blank">iconv()</a>, для ручной
+      конвертации текста. Например: <code style="font-size:.9em;">return iconv(\'WINDOWS-1251\', \'UTF-8\', $doc->find(\'selector\')->text());</code></p>
     ',
   );
   
@@ -189,7 +196,7 @@ function parser_job_form($form, &$form_state, $job) {
     'taxonomy_term_reference' => 'PHP код, который должен вернуть название термина, либо массив названий. Отсутствующие термины будут созданы автоматически. Пример заполнения:<br /><code>$terms = array();<br />foreach ($doc->find(\'.tags li\') as $li) $terms[] = pq($li)->text();<br />return $terms;</code>',
     'text_with_summary'       => 'PHP код, который должен вернуть значение поля. Пример заполнения: <code>return $doc->find(\'article.content\')->html();</code>',
     'list_text'               => 'PHP код, который должен вернуть либо ключ из списка допустимых значений, либо подпись. Если значения нет в списке допустимых, то оно будет проигнорированно. Пример заполнения: <code>return $doc->find(\'selector\')->text();</code>',
-    'node_reference'          => 'PHP код, который должен вернуть либо nid материала, либо его заголовок (не рекомендуется).',
+    'node_reference'          => 'PHP код, который должен вернуть либо nid материала, либо его заголовок (не рекомендуется). Чтобы получить nid материала по идентификатору страницы, воспользуйтесь функцией parser_get_nid_by_page_key($page_key)',
   );
   
   foreach ($fields as $field_name => $field) {
@@ -407,17 +414,19 @@ function parser_parse($job, &$context) {
     $context['results']['created_nodes'] = 0;
     $context['results']['updated_nodes'] = 0;
     $context['results']['pages_from_http'] = 0;
+    $context['results']['error_pages_from_http'] = 0;
     $context['results']['pages_from_cache'] = 0;
     $context['results']['downloaded_files'] = 0;
+    $context['results']['nids'] = array();
   }
   
-  // Parsing -----------------------------------------------------------------------------------------------------------
   $url = _parser_url_get_not_parsed();
   $page_url = $url->url;
   $parsed_url = parse_url($page_url);
-  $nid = _parser_get_nid_by_url($page_url, $job->id);
   $page = _parser_get_page_by_url($page_url, $job->site_charset, FALSE, $context['results']);
   $doc = _parser_create_phpquery($page, $job->site_charset_fix);
+  $nid = parser_get_nid_by_url($page_url, $job->id);
+  $page_key = '';
   
   // Find links
   if ($url->depth < $job->depth) {
@@ -442,6 +451,7 @@ function parser_parse($job, &$context) {
     }
   }
   
+  // Parse cur page or not parse
   $allowed_parse = TRUE;
   if (!$page) {
     $allowed_parse = FALSE;
@@ -451,6 +461,15 @@ function parser_parse($job, &$context) {
   }
   if ($allowed_parse && $job->check_code) {
     $allowed_parse = eval($job->check_code);
+    if ($allowed_parse && !is_bool($allowed_parse)) {
+      $page_key = $allowed_parse;
+      if (!$nid) {
+        $nid = parser_get_nid_by_page_key($page_key, $job->id);
+      }
+    }
+  }
+  if ($allowed_parse && $nid && in_array($nid, $context['results']['nids'])) {
+    $allowed_parse = FALSE;
   }
   if ($allowed_parse && $job->no_update_nodes && $nid) {
     $allowed_parse = FALSE;
@@ -461,10 +480,12 @@ function parser_parse($job, &$context) {
     $fields = field_info_fields();
     $instances = field_info_instances();
     
+    // Load node
     if ($nid) {
       $node = node_load($nid);
       $context['results']['updated_nodes']++;
     }
+    // Create node
     else {
       $node = new stdClass();
       $node->type = $job->node_type;
@@ -478,6 +499,7 @@ function parser_parse($job, &$context) {
       $node->title = 'No Title';
     }
     
+    // Populate fields
     foreach ($job->node_fields_code as $field_name => $php_code) {
       if (isset($fields[$field_name])) {
         $result = eval($php_code);
@@ -509,27 +531,33 @@ function parser_parse($job, &$context) {
       }
       node_save($node);
       
-      if (!$nid) {
-        _parser_node_add($job->id, $node->nid, $page_url);
-      }
-      
+      _parser_node_save(array(
+        'jid' => $job->id,
+        'nid' => $node->nid,
+        'url' => $page_url,
+        'page_key' => $page_key,
+      ));
+    
+      $context['sandbox']['nids'][] = $node->nid;
       $context['sandbox']['num_created_node']++;
     }
   }
   
   _parser_url_mark_parsed($page_url);
-  // -------------------------------------------------------------------------------------------------------------------
 
   $context['sandbox']['max'] = _parser_url_count();
   $context['sandbox']['progress']++;
-  $context['message'] = 'Завершён парсинг страницы <em>' . $page_url . '</em> с глубиной ' . $url->depth . '<br />';
-  $context['message'] .= 'Страниц в очереди: ' . ($context['sandbox']['max'] - $context['sandbox']['progress']) . '<br />';
-  $context['message'] .= 'Создано нод: ' . $context['results']['created_nodes'] . '<br />';
-  $context['message'] .= 'Обновлено нод: ' . $context['results']['updated_nodes'] . '<br />';
-  $context['message'] .= 'Скачано страниц: ' . $context['results']['pages_from_http'] . '<br />';
-  $context['message'] .= 'Страниц взято из кэша: ' . $context['results']['pages_from_cache'] . '<br />';
-  $context['message'] .= 'Скачано файлов: ' . $context['results']['downloaded_files'] . '<br />';
-  $context['message'] .= 'Затраченное время: ' . gmdate('H:i:s', time() - $context['results']['time_start']) . '<br />';
+  $context['message'] = '
+    Завершён парсинг страницы <em>' . $page_url . '</em> с глубиной ' . $url->depth . '<br />
+    Страниц в очереди: ' . ($context['sandbox']['max'] - $context['sandbox']['progress']) . '<br />
+    Создано нод: ' . $context['results']['created_nodes'] . '<br />
+    Обновлено нод: ' . $context['results']['updated_nodes'] . '<br />
+    Скачано страниц: ' . $context['results']['pages_from_http'] . '<br />
+    Не удалось скачать страниц: ' . $context['results']['error_pages_from_http'] . '<br />
+    Страниц взято из кэша: ' . $context['results']['pages_from_cache'] . '<br />
+    Скачано файлов: ' . $context['results']['downloaded_files'] . '<br />
+    Затраченное время: ' . gmdate('H:i:s', time() - $context['results']['time_start']) . '
+  ';
 
   if ($job->node_limit && $context['sandbox']['num_created_node'] >= $job->node_limit) {
     $context['finished'] = 1;
@@ -546,6 +574,7 @@ function parser_finished($success, $results, $operations) {
   drupal_set_message('
     ' . ($success ? 'Парсинг закончен' : 'Парсинг закончился с ошибками') . '.
     Обработано страниц: ' . _parser_url_count(TRUE) . '.
+    Не удалось скачать страниц: ' . $results['error_pages_from_http'] . '.
     Создано нод: ' . l($results['created_nodes'], 'admin/structure/parser_jobs/results/' . $results['jid']) . '.
     Обновлено нод: ' . l($results['updated_nodes'], 'admin/structure/parser_jobs/results/' . $results['jid']) . '.
     Скачано файлов: ' . $results['downloaded_files'] . '
@@ -602,7 +631,7 @@ function parser_check_code() {
  */
 function parser_result_page($job) {
   $query = db_select('parser_nodes', 'pn');
-  $query->fields('pn', array('nid', 'url'));
+  $query->fields('pn', array('nid', 'url', 'page_key'));
   $query->fields('n', array('title'));
   $query->leftJoin('node', 'n', 'pn.nid = n.nid');
   $query->condition('jid', $job->id);
@@ -613,11 +642,12 @@ function parser_result_page($job) {
     $rows[] = array(
       l($row->url, $row->url),
       l($row->title, 'node/' . $row->nid),
+      $row->page_key,
     );
   }
     
   return theme('table', array(
-    'header' => array('URL', t('Title')),
+    'header' => array('URL', t('Title'), t('Identifier')),
     'rows' => $rows,
     'empty' => 'Пусто...',
   ));
@@ -656,6 +686,50 @@ function parser_library() {
   );
 
   return $libraries;
+}
+
+/**
+ * Return nid by URL
+ */
+function parser_get_nid_by_url($url, $jid = NULL) {
+  $query = db_select('parser_nodes', 'pn')
+    ->fields('pn', array('nid'))
+    ->condition('url', $url)
+    ->range(0, 1);
+    
+  if ($jid) {
+    $query->condition('jid', $jid);
+  }
+  
+  return $query->execute()->fetchField();
+}
+
+/**
+ * Return nid by Page Key
+ */
+function parser_get_nid_by_page_key($page_key, $jid = NULL) {
+  $query = db_select('parser_nodes', 'pn')
+    ->fields('pn', array('nid'))
+    ->condition('page_key', $page_key)
+    ->range(0, 1);
+
+  if ($jid) {
+    $query->condition('jid', $jid);
+  }
+  
+  return $query->execute()->fetchField();
+}
+
+/**
+ * Return nid by Node Title
+ */
+function parser_get_nid_by_title($title) {
+  return db_select('node', 'n')
+    ->fields('n', array('nid'))
+    ->condition('title', $title)
+    ->range(0, 1)
+    ->execute()
+    ->fetchField();
 }
 
 /**
@@ -757,13 +831,22 @@ function _parser_get_page_by_url($url, $charset = 'auto', $skip_cache = FALSE, &
     }
     else {
       watchdog('parser', 'Не удалось скачать страницу ' . $url . (isset($result->error) ? '. Ошибка: ' . $result->error : ''), array(), WATCHDOG_ALERT);
+      
+      if ($results) {
+        $results['error_pages_from_http']++;
+      }
     }
     
-    $results['pages_from_http']++;
+    if ($results) {
+      $results['pages_from_http']++;
+    }
   }
   else {
     $page = $cached_data->data;
-    $results['pages_from_cache']++;
+    
+    if ($results) {
+      $results['pages_from_cache']++;
+    }
   }
   return $page;
 }
@@ -983,7 +1066,7 @@ function _parser_add_field_node_reference(&$node, $field_name, $field_values, $f
       $node->{$field_name}[LANGUAGE_NONE][]['nid'] = $field_value;
     }
     else {
-      $nid = _parser_get_nid_by_title(trim($field_value));
+      $nid = parser_get_nid_by_title(trim($field_value));
       if ($nid) {
         $node->{$field_name}[LANGUAGE_NONE][]['nid'] = $nid;
       }
@@ -994,36 +1077,17 @@ function _parser_add_field_node_reference(&$node, $field_name, $field_values, $f
 /**
  * Add relations node to url
  */
-function _parser_node_add($jid, $nid, $url) {
-  db_insert('parser_nodes')->fields(array(
-    'jid' => $jid,
-    'nid' => $nid,
-    'url' => $url,
-  ))->execute();
-}
-
-/**
- * Return nid by URL
- */
-function _parser_get_nid_by_url($url, $jid) {
-  return db_select('parser_nodes', 'pn')
-    ->fields('pn', array('nid'))
-    ->condition('url', $url)
-    ->condition('jid', $jid)
-    ->execute()
-    ->fetchField();
-}
-
-/**
- * Return nid by Node Title
- */
-function _parser_get_nid_by_title($title) {
-  return db_select('node', 'n')
-    ->fields('n', array('nid'))
-    ->condition('title', $title)
-    ->range(0, 1)
-    ->execute()
-    ->fetchField();
+function _parser_node_save($record) {
+  db_merge('parser_nodes')
+    ->key(array(
+      'jid' => $record['jid'],
+      'nid' => $record['nid'],
+    ))
+    ->fields(array(
+      'url' => $record['url'],
+      'page_key' => $record['page_key'],
+    ))
+    ->execute();
 }
 
 /**

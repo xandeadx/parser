@@ -129,13 +129,13 @@ function parser_job_form($form, &$form_state, $job) {
     '#resizable' => FALSE,
   ) + $check_button;
   
-  $node_types = node_type_get_names();
-  $form['node_type'] = array(
+  $bundles = node_type_get_names();
+  $form['bundle'] = array(
     '#type' => 'select',
-    '#title' => 'Тип материала',
+    '#title' => t('Bundle'),
     '#description' => 'Выберите тип материала, который будет создавать парсер.',
-    '#options' => $node_types,
-    '#default_value' => isset($job->node_type) ? $job->node_type : key($node_types),
+    '#options' => $bundles,
+    '#default_value' => isset($job->bundle) ? $job->bundle : key($bundles),
     '#required' => TRUE,
     '#ajax' => array(
       'callback' => 'parser_job_form_fields',
@@ -154,36 +154,36 @@ function parser_job_form($form, &$form_state, $job) {
     ',
   );
   
-  $form['fields']['node_title_code_fieldset'] = array(
+  $form['fields']['label_code_fieldset'] = array(
     '#type' => 'fieldset',
     '#title' => 'title',
     '#collapsible' => TRUE,
     '#collapsed' => TRUE,
   );
   
-  $form['fields']['node_title_code_fieldset']['node_title_code'] = array(
+  $form['fields']['label_code_fieldset']['label_code'] = array(
     '#type' => 'textarea',
     '#title' => 'title',
     '#description' => 'PHP код, который должен вернуть заголовок ноды. Пример заполнения: <code>return $doc->find(\'h1\')->text();</code>',
-    '#default_value' => isset($job->node_title_code) ? $job->node_title_code : '',
+    '#default_value' => isset($job->label_code) ? $job->label_code : '',
     '#required' => TRUE,
     '#rows' => 3,
     '#resizable' => FALSE,
   ) + $check_button;
   
-  $form['fields']['node_fields_code'] = array(
+  $form['fields']['fields_code'] = array(
     '#prefix' => '<div id="node-fields-code">',
     '#suffix' => '</div>',
     '#tree' => TRUE,
   );
   
-  $node_type = $form['node_type']['#default_value'];
-  if (isset($form_state['values']['node_type'])) {
-    $node_type = $form_state['values']['node_type'];
+  $bundle = $form['bundle']['#default_value'];
+  if (isset($form_state['values']['bundle'])) {
+    $bundle = $form_state['values']['bundle'];
   }
   $fields = field_info_fields();
   $instances = field_info_instances();
-  $node_fields_code = isset($job->node_fields_code) ? $job->node_fields_code : array();
+  $fields_code = isset($job->fields_code) ? $job->fields_code : array();
   $formats = filter_formats();
   $format_options = array();
   foreach ($formats as $format) {
@@ -200,39 +200,39 @@ function parser_job_form($form, &$form_state, $job) {
   );
   
   foreach ($fields as $field_name => $field) {
-    if (isset($field['bundles']['node']) && in_array($node_type, $field['bundles']['node'])) {
+    if (isset($field['bundles']['node']) && in_array($bundle, $field['bundles']['node'])) {
       $description = isset($descriptions[$field['type']]) ? $descriptions[$field['type']] : $descriptions['default'];
       $description .= !function_exists('_parser_add_field_' . $field['type']) ? ' <span style="color:red;">Тип поля не поддерживается, это значит что код должен вернуть структуру поля. Например: <code>return array(0 => array(\'value\' => $doc->find(\'#some-id\')->text()));</code></span>' : '';
       $fieldset_name = $field_name . '_fieldset';
       
-      $form['fields']['node_fields_code'][$fieldset_name] = array(
+      $form['fields']['fields_code'][$fieldset_name] = array(
         '#type' => 'fieldset',
         '#title' => $field_name,
         '#collapsible' => TRUE,
         '#collapsed' => TRUE,
       );
   
-      $form['fields']['node_fields_code'][$fieldset_name][$field_name] = array(
+      $form['fields']['fields_code'][$fieldset_name][$field_name] = array(
         '#type' => 'textarea',
         '#title' => 'PHP код',
         '#description' => $description,
-        '#default_value' => isset($node_fields_code[$field_name]) ? $node_fields_code[$field_name] : '',
+        '#default_value' => isset($fields_code[$field_name]) ? $fields_code[$field_name] : '',
         '#rows' => 3,
         '#resizable' => FALSE,
       ) + $check_button;
 
-      if (!empty($instances['node'][$node_type][$field_name]['settings']['text_processing'])) {
-        $form['fields']['node_fields_code'][$fieldset_name][$field_name . '_format'] = array(
+      if (!empty($instances['node'][$bundle][$field_name]['settings']['text_processing'])) {
+        $form['fields']['fields_code'][$fieldset_name][$field_name . '_format'] = array(
           '#type' => 'select',
           '#title' => 'Формат текста',
           '#description' => 'Формат текста, который будет установлен для поля.',
           '#options' => $format_options,
-          '#default_value' => isset($node_fields_code[$field_name . '_format']) ? $node_fields_code[$field_name . '_format'] : '',
+          '#default_value' => isset($fields_code[$field_name . '_format']) ? $fields_code[$field_name . '_format'] : '',
         );
       }
       
       if ($field['type'] == 'taxonomy_term_reference') {
-        $form['fields']['node_fields_code'][$fieldset_name][$field_name . '_clear_voc'] = array(
+        $form['fields']['fields_code'][$fieldset_name][$field_name . '_clear_voc'] = array(
           '#type' => 'checkbox',
           '#title' => 'Очистить словарь перед парсингом.',
         );
@@ -247,11 +247,11 @@ function parser_job_form($form, &$form_state, $job) {
     '#collapsed' => TRUE,
   );
   
-  $form['advanced_settings']['node_limit'] = array(
+  $form['advanced_settings']['parse_limit'] = array(
     '#type' => 'textfield',
-    '#title' => 'Ограничить число нод',
+    '#title' => 'Ограничить число сущностей',
     '#description' => 'Максимальное число нод, которое сможет создать парсер. Применяется для тестирования. Оставьте пустым, если ограничения не нужны.',
-    '#default_value' => !empty($job->node_limit) ? $job->node_limit : '',
+    '#default_value' => !empty($job->parse_limit) ? $job->parse_limit : '',
     '#size' => 5,
   );
   
@@ -263,11 +263,11 @@ function parser_job_form($form, &$form_state, $job) {
     '#default_value' => isset($job->site_charset) ? $job->site_charset : 'auto',
   );
   
-  $form['advanced_settings']['site_charset_fix'] = array(
+  $form['advanced_settings']['charset_fix'] = array(
     '#type' => 'checkbox',
     '#title' => 'Передавать кодировку в конструктор phpQuery',
     '#description' => 'Отметьте эту опцию, если возникают проблемы с кодировкой. Костыль для phpQuery.',
-    '#default_value' => isset($job->site_charset_fix) ? $job->site_charset_fix : FALSE,
+    '#default_value' => isset($job->charset_fix) ? $job->charset_fix : FALSE,
   );
   
   $form['advanced_settings']['only_this_domen'] = array(
@@ -285,26 +285,18 @@ function parser_job_form($form, &$form_state, $job) {
     '#disabled' => !module_exists('path'),
   );
   
-  $form['advanced_settings']['no_update_nodes'] = array(
+  $form['advanced_settings']['no_update'] = array(
     '#type' => 'checkbox',
-    '#title' => 'Не обновлять ноды',
+    '#title' => 'Не обновлять сущности',
     '#description' => 'Отметьте, если не хотите обновлять ноды, созданные в предыдущие запуски этого задания',
-    '#default_value' => isset($job->no_update_nodes) ? $job->no_update_nodes : 0,
+    '#default_value' => isset($job->no_update) ? $job->no_update : 0,
   );
   
-  $form['advanced_settings']['node_language'] = array(
-    '#type' => 'select',
-    '#title' => 'Язык материала',
-    '#description' => 'Язык материалов ($node->language). Выберите "und" если не знаете зачем это нужно.',
-    '#options' => drupal_map_assoc(field_content_languages()),
-    '#default_value' => isset($job->node_language) ? $job->node_language : 'und',
-  );
-  
-  $form['advanced_settings']['node_prepare_code'] = array(
+  $form['advanced_settings']['prepare_code'] = array(
     '#type' => 'textarea',
-    '#title' => 'Пост обработка ноды',
+    '#title' => 'Пост обработка сущности',
     '#description' => 'Код, который будет выполнен перед вызовом node_save(). Доступные переменные: $node - объект ноды, $page - html код страницы, $doc - объект phpQuery. Пример заполнения: <code>$node->title = \'new title\';</code>',
-    '#default_value' => isset($job->node_prepare_code) ? $job->node_prepare_code : '',
+    '#default_value' => isset($job->prepare_code) ? $job->prepare_code : '',
     '#rows' => 3,
     '#resizable' => FALSE,
   );
@@ -338,7 +330,7 @@ function parser_job_form($form, &$form_state, $job) {
  * Ajax callback
  */
 function parser_job_form_fields($form, $form_state) {
-  return $form['fields']['node_fields_code'];
+  return $form['fields']['fields_code'];
 }
 
 /**
@@ -349,38 +341,34 @@ function parser_job_form_submit(&$form, &$form_state) {
   $values = $form_state['values'];
   $fields = field_info_fields();
   
-  $node_fields_code = array();
-  foreach ($form_state['values']['node_fields_code'] as $fieldset) {
+  $fields_code = array();
+  foreach ($form_state['values']['fields_code'] as $fieldset) {
     foreach ($fieldset as $field_name => $field_value) {
-      $node_fields_code[$field_name] = $field_value;
+      $fields_code[$field_name] = $field_value;
     }
   }
-  $node_fields_code = array_diff($node_fields_code, array(''));
-  $form_state['values']['node_fields_code'] = $node_fields_code;
+  $fields_code = array_diff($fields_code, array(''));
+  $form_state['values']['fields_code'] = $fields_code;
   
-  if (!is_int($form_state['values']['node_limit'])) {
-    $form_state['values']['node_limit'] = 0;
+  if (!$form_state['values']['parse_limit']) {
+    $form_state['values']['parse_limit'] = 0;
   }
   
   $job = entity_ui_form_submit_build_entity($form, $form_state);
-  
-  if ($clicked_button == 'Сохранить задание' || $clicked_button == 'Сохранить задание и Начать парсинг') {
-    $job->save();
-  }
+  $job->save();
   
   if ($clicked_button == 'Сохранить задание') {
     drupal_set_message('Задание сохранено.');
     $form_state['redirect'] = 'admin/structure/parser_jobs/manage/' . $job->id;
   }
-  
-  if ($clicked_button == 'Сохранить задание и Начать парсинг') {
+  else if ($clicked_button == 'Сохранить задание и Начать парсинг') {
     // Clear vocabularies
     foreach ($fields as $field_name => $field) {
       if (
         isset($field['bundles']['node']) &&
-        in_array($values['node_type'], $field['bundles']['node']) &&
+        in_array($values['bundle'], $field['bundles']['node']) &&
         $field['type'] == 'taxonomy_term_reference' &&
-        $node_fields_code[$field_name . '_clear_voc']
+        $fields_code[$field_name . '_clear_voc']
       ) {
         _parser_clear_vocabulary($field['settings']['allowed_values'][0]['vocabulary']);
       }
@@ -417,6 +405,7 @@ function parser_parse($job, &$context) {
     $context['results']['error_pages_from_http'] = 0;
     $context['results']['pages_from_cache'] = 0;
     $context['results']['downloaded_files'] = 0;
+    $context['results']['files_from_cache'] = 0;
     $context['results']['nids'] = array();
   }
   
@@ -424,7 +413,7 @@ function parser_parse($job, &$context) {
   $page_url = $url->url;
   $parsed_url = parse_url($page_url);
   $page = _parser_get_page_by_url($page_url, $job->site_charset, FALSE, $context['results']);
-  $doc = _parser_create_phpquery($page, $job->site_charset_fix);
+  $doc = _parser_create_phpquery($page, $job->charset_fix);
   $nid = parser_get_nid_by_url($page_url, $job->id);
   $page_key = '';
   
@@ -450,13 +439,13 @@ function parser_parse($job, &$context) {
       }
     }
   }
-  
+
   // Parse cur page or not parse
   $allowed_parse = TRUE;
   if (!$page) {
     $allowed_parse = FALSE;
   }
-  if ($allowed_parse && $job->node_limit && $context['sandbox']['num_created_node'] >= $job->node_limit) {
+  if ($allowed_parse && $job->parse_limit && $context['sandbox']['num_created_node'] >= $job->parse_limit) {
     $allowed_parse = FALSE;
   }
   if ($allowed_parse && $job->check_code) {
@@ -471,7 +460,7 @@ function parser_parse($job, &$context) {
   if ($allowed_parse && $nid && in_array($nid, $context['results']['nids'])) {
     $allowed_parse = FALSE;
   }
-  if ($allowed_parse && $job->no_update_nodes && $nid) {
+  if ($allowed_parse && $job->no_update && $nid) {
     $allowed_parse = FALSE;
   }
   
@@ -488,19 +477,18 @@ function parser_parse($job, &$context) {
     // Create node
     else {
       $node = new stdClass();
-      $node->type = $job->node_type;
-      $node->language = $job->node_language;
+      $node->type = $job->bundle;
+      $node->language = LANGUAGE_NONE;
       $context['results']['created_nodes']++;
     }
     
-    $node->title = eval($job->node_title_code);
-    $node->title = trim($node->title);
+    $node->title = trim(eval($job->label_code));
     if (!$node->title) {
       $node->title = 'No Title';
     }
     
     // Populate fields
-    foreach ($job->node_fields_code as $field_name => $php_code) {
+    foreach ($job->fields_code as $field_name => $php_code) {
       if (isset($fields[$field_name])) {
         $result = eval($php_code);
         
@@ -512,7 +500,7 @@ function parser_parse($job, &$context) {
         if (!function_exists($function)) {
           $function = '_parser_add_field';
         }
-        $function($node, $field_name, $result, $fields, $instances, $job->node_fields_code, $page_url, $context['results']);
+        $function($node, $field_name, $result, $fields, $instances, $job->fields_code, $page_url, $context['results']);
       }
     }
     
@@ -526,8 +514,8 @@ function parser_parse($job, &$context) {
       }
     
       node_object_prepare($node);
-      if ($job->node_prepare_code) {
-        eval($job->node_prepare_code);
+      if ($job->prepare_code) {
+        eval($job->prepare_code);
       }
       node_save($node);
       
@@ -556,10 +544,11 @@ function parser_parse($job, &$context) {
     Не удалось скачать страниц: ' . $context['results']['error_pages_from_http'] . '<br />
     Страниц взято из кэша: ' . $context['results']['pages_from_cache'] . '<br />
     Скачано файлов: ' . $context['results']['downloaded_files'] . '<br />
+    Файлов взято из кэша: ' . $context['results']['files_from_cache'] . '<br />
     Затраченное время: ' . gmdate('H:i:s', time() - $context['results']['time_start']) . '
   ';
 
-  if ($job->node_limit && $context['sandbox']['num_created_node'] >= $job->node_limit) {
+  if ($job->parse_limit && $context['sandbox']['num_created_node'] >= $job->parse_limit) {
     $context['finished'] = 1;
   }
   elseif ($context['sandbox']['progress'] <= $context['sandbox']['max']) {
@@ -577,7 +566,7 @@ function parser_finished($success, $results, $operations) {
     Не удалось скачать страниц: ' . $results['error_pages_from_http'] . '.
     Создано нод: ' . l($results['created_nodes'], 'admin/structure/parser_jobs/results/' . $results['jid']) . '.
     Обновлено нод: ' . l($results['updated_nodes'], 'admin/structure/parser_jobs/results/' . $results['jid']) . '.
-    Скачано файлов: ' . $results['downloaded_files'] . '
+    Скачано файлов: ' . $results['downloaded_files'] . '.
     Затрачено времени: ' . gmdate('H:i:s', time() - $results['time_start']) . '.
     ' . l('Посмотреть системный журнал', 'admin/reports/dblog') . '
   ');
@@ -610,7 +599,7 @@ function parser_node_view($node, $view_mode, $langcode) {
  * Check php code
  */
 function parser_check_code() {
-  $params = array('test_url', 'site_charset', 'site_charset_fix', 'field_name', 'field_value');
+  $params = array('test_url', 'site_charset', 'charset_fix', 'field_name', 'field_value');
   foreach ($params as $param) {
     if (!isset($_POST[$param]) || $_POST[$param] === '') {
       echo 'bad params';
@@ -620,10 +609,10 @@ function parser_check_code() {
   
   $page = _parser_get_page_by_url($_POST['test_url'], $_POST['site_charset']);
   $page_url = $_POST['test_url'];
-  $doc = _parser_create_phpquery($page, $_POST['site_charset_fix']);
+  $doc = _parser_create_phpquery($page, $_POST['charset_fix']);
   $result = eval($_POST['field_value']);
   
-  echo print_r($result, true);
+  echo print_r($result, TRUE);
 }
 
 /**
@@ -802,9 +791,9 @@ function _parser_url_count($parsed = null) {
  * Return page html by URL
  */
 function _parser_get_page_by_url($url, $charset = 'auto', $skip_cache = FALSE, &$results = NULL) {
-  $cid = 'parser:' . $url . ':' . $charset;
-  $cached_data = cache_get($cid);
-  if (!$cached_data || $skip_cache) {
+  $cache_uri = 'public://parser_cache/html/' . md5($url) . '.html';
+
+  if (!file_exists($cache_uri) || $skip_cache) {
     $options = array('headers' => array('User-Agent' => 'Opera/9.80 (Windows NT 6.1; U; ru) Presto/2.8.131 Version/11.10')); 
     $result = drupal_http_request($url, $options);
     if ($result->code == 303 && !empty($result->headers['location'])) {
@@ -813,21 +802,11 @@ function _parser_get_page_by_url($url, $charset = 'auto', $skip_cache = FALSE, &
   
     if (!empty($result->data)) {
       $page = $result->data;
+      file_unmanaged_save_data($page, $cache_uri);
       
-      if ($charset == 'auto') {
-        if (preg_match('#<meta http-equiv="Content-Type" content="text/html; charset=([^"])"+#iU', $page, $matches) && strtolower($matches[1]) != 'utf-8') {
-          $page = iconv($matches[1], 'UTF-8', $page);
-          $page = str_ireplace(
-            '<meta http-equiv="Content-Type" content="text/html; charset=' . $matches[1] . '"',
-            '<meta http-equiv="Content-Type" content="text/html; charset=utf-8"',
-            $page
-          );
-        }
+      if ($results) {
+        $results['pages_from_http']++;
       }
-      else if ($charset != 'UTF-8') {
-        $page = iconv($charset, 'UTF-8', $page);
-      }
-      cache_set($cid, $page);
     }
     else {
       watchdog('parser', 'Не удалось скачать страницу ' . $url . (isset($result->error) ? '. Ошибка: ' . $result->error : ''), array(), WATCHDOG_ALERT);
@@ -836,32 +815,44 @@ function _parser_get_page_by_url($url, $charset = 'auto', $skip_cache = FALSE, &
         $results['error_pages_from_http']++;
       }
     }
-    
-    if ($results) {
-      $results['pages_from_http']++;
-    }
   }
   else {
-    $page = $cached_data->data;
+    $page = file_get_contents($cache_uri);
     
     if ($results) {
       $results['pages_from_cache']++;
     }
   }
+  
+  // Convert charset
+  if ($charset == 'auto') {
+    if (preg_match('#<meta http-equiv="Content-Type" content="text/html; charset=([^"])"+#iU', $page, $matches) && drupal_strtolower($matches[1]) != 'utf-8') {
+      $page = iconv($matches[1], 'UTF-8', $page);
+      $page = str_ireplace(
+        '<meta http-equiv="Content-Type" content="text/html; charset=' . $matches[1] . '"',
+        '<meta http-equiv="Content-Type" content="text/html; charset=utf-8"',
+        $page
+      );
+    }
+  }
+  else if ($charset != 'UTF-8') {
+    $page = iconv($charset, 'UTF-8', $page);
+  }
+      
   return $page;
 }
 
 /**
  * Attach field to node object
  */
-function _parser_add_field(&$node, $field_name, $field_value, $fields, $instances, $node_fields_code, $page_url) {
+function _parser_add_field(&$node, $field_name, $field_value, $fields, $instances, $fields_code, $page_url) {
   $node->{$field_name}[LANGUAGE_NONE] = $field_value;
 }
 
 /**
  * Attach field type "text" to node object
  */
-function _parser_add_field_text(&$node, $field_name, $field_values, $fields, $instances, $node_fields_code, $page_url) {
+function _parser_add_field_text(&$node, $field_name, $field_values, $fields, $instances, $fields_code, $page_url) {
   if (!is_array($field_values)) {
     $field_values = array($field_values);
   }
@@ -879,7 +870,7 @@ function _parser_add_field_text(&$node, $field_name, $field_values, $fields, $in
     $node->{$field_name}[LANGUAGE_NONE][$i]['value'] = $field_value;
   
     if ($instances['node'][$node->type][$field_name]['settings']['text_processing']) {
-      $node->{$field_name}[LANGUAGE_NONE][$i]['format'] = $node_fields_code[$field_name . '_format'];
+      $node->{$field_name}[LANGUAGE_NONE][$i]['format'] = $fields_code[$field_name . '_format'];
     }
     
     $i++;
@@ -889,14 +880,14 @@ function _parser_add_field_text(&$node, $field_name, $field_values, $fields, $in
 /**
  * Attach field type "text_with_summary" to node object
  */
-function _parser_add_field_text_with_summary(&$node, $field_name, $field_values, $fields, $instances, $node_fields_code, $page_url) {
-  _parser_add_field_text($node, $field_name, $field_values, $fields, $instances, $node_fields_code, $page_url);
+function _parser_add_field_text_with_summary(&$node, $field_name, $field_values, $fields, $instances, $fields_code, $page_url) {
+  _parser_add_field_text($node, $field_name, $field_values, $fields, $instances, $fields_code, $page_url);
 }
 
 /**
  * Attach field type "file" to node object
  */
-function _parser_add_field_file(&$node, $field_name, $field_values, $fields, $instances, $node_fields_code, $page_url, &$results) {
+function _parser_add_field_file(&$node, $field_name, $field_values, $fields, $instances, $fields_code, $page_url, &$results) {
   if (!$field_values) {
     return FALSE;
   }
@@ -908,18 +899,21 @@ function _parser_add_field_file(&$node, $field_name, $field_values, $fields, $in
   $field_settings = $instances['node'][$node->type][$field_name]['settings'];
   $dest_dir = 'public://' . $field_settings['file_directory'];
   file_prepare_directory($dest_dir, FILE_CREATE_DIRECTORY);
+  $allowed_file_extensions = explode(' ', $field_settings['file_extensions']);
 
   foreach ($field_values as $field_value) {
     if (!$field_value) {
       continue;
     }
     
+    $file_url = _parser_get_full_url($field_value, $page_url);
     $file_name = drupal_basename($field_value);
+    $file_ext = pathinfo($file_name, PATHINFO_EXTENSION);
     if (function_exists('transliteration_clean_filename')) {
-      $file_name = transliteration_clean_filename($file_name, $node->language);
+      $file_name = transliteration_clean_filename($file_name);
     }
     if (drupal_strlen(pathinfo($file_name, PATHINFO_FILENAME)) > 64) {
-      $file_name = drupal_substr($file_name, 0, 64) . '.' . pathinfo($file_name, PATHINFO_EXTENSION);
+      $file_name = drupal_substr($file_name, 0, 64) . '.' . $file_ext;
     }
     
     // If file already attached, then break current iteration
@@ -937,34 +931,46 @@ function _parser_add_field_file(&$node, $field_name, $field_values, $fields, $in
       }
     }
     
-    $file_url = _parser_get_full_url($field_value, $page_url);
-    
     // Validate by extensions
-    $allowed_file_extensions = str_replace(' ', '|', $field_settings['file_extensions']);
-    if (!preg_match('#\.(' . $allowed_file_extensions . ')$#i', $file_name)) {
+    if (!in_array($file_ext, $allowed_file_extensions)) {
       watchdog('parser', 'Файл <i>' . check_plain($file_url) . '</i> закачан не будет, так как его тип не в списке допустимых.');
       continue;
     }
     
-    // Save remote file to server
-    $result = drupal_http_request($file_url);
+    $cache_uri = 'public://parser_cache/files/' . md5($file_url) . '.' . $file_ext;
+    if (!file_exists($cache_uri)) {
+      // Download remote file
+      $result = drupal_http_request($file_url);
 
-    if (!empty($result->error)) {
-      watchdog('parser', 'Ошибка при закачке файла. <b>Адрес</b>: ' . check_plain($file_url) . ', <b>Ошибка</b>: ' . $result->error . ', <b>Результат</b>: ' . check_plain($result->data));
-      continue;
+      if (!empty($result->error)) {
+        watchdog('parser', 'Ошибка при закачке файла. <b>Адрес</b>: ' . check_plain($file_url) . ', <b>Ошибка</b>: ' . $result->error . ', <b>Результат</b>: ' . check_plain($result->data));
+        continue;
+      }
+      if (!$result->data) {
+        watchdog('parser', 'Ошибка при закачке файла. <b>Адрес</b>: ' . check_plain($file_url) . ', <b>Ошибка</b>: сервер не возвратил данных.');
+        continue;
+      }
+    
+      // Save file to cache
+      file_unmanaged_save_data($result->data, $cache_uri);
+      $results['downloaded_files']++;
     }
-    if (!$result->data) {
-      watchdog('parser', 'Ошибка при закачке файла. <b>Адрес</b>: ' . check_plain($file_url) . ', <b>Ошибка</b>: сервер не возвратил данных.');
-      continue;
+    else {
+      $results['files_from_cache']++;
     }
-  
-    $filepath = $dest_dir . ($dest_dir != 'public://' ? '/' : '') . $file_name;
-    $file = file_save_data($result->data, $filepath);
+    
+    // Copy file from cache to $dest_dir
+    $file = (object)array(
+      'uid' => $GLOBALS['user']->uid,
+      'uri' => $cache_uri,
+      'filename' => $file_name,
+      'filemime' => file_get_mimetype($cache_uri),
+    );
+    $file_path = file_stream_wrapper_uri_normalize($dest_dir . '/' . $file_name);
+    $file = file_copy($file, $file_path);
     if ($file) {
       $files[] = (array)$file + array('display' => 1);
     }
-    
-    $results['downloaded_files']++;
   }
   
   if (isset($node->{$field_name})) {
@@ -977,14 +983,14 @@ function _parser_add_field_file(&$node, $field_name, $field_values, $fields, $in
 /**
  * Attach field type "image" to node object
  */
-function _parser_add_field_image(&$node, $field_name, $field_values, $fields, $instances, $node_fields_code, $page_url, &$results) {
-  _parser_add_field_file($node, $field_name, $field_values, $fields, $instances, $node_fields_code, $page_url, $results);
+function _parser_add_field_image(&$node, $field_name, $field_values, $fields, $instances, $fields_code, $page_url, &$results) {
+  _parser_add_field_file($node, $field_name, $field_values, $fields, $instances, $fields_code, $page_url, $results);
 }
 
 /**
  * Attach field type "taxonomy_term_reference" to node object
  */
-function _parser_add_field_taxonomy_term_reference(&$node, $field_name, $field_values, $fields, $instances, $node_fields_code, $page_url) {
+function _parser_add_field_taxonomy_term_reference(&$node, $field_name, $field_values, $fields, $instances, $fields_code, $page_url) {
   if (!is_array($field_values)) {
     $field_values = array($field_values);
   }
@@ -1009,7 +1015,7 @@ function _parser_add_field_taxonomy_term_reference(&$node, $field_name, $field_v
 /**
  * Attach field type "number_integer" to node object
  */
-function _parser_add_field_number_integer(&$node, $field_name, $field_values, $fields, $instances, $node_fields_code, $page_url) {
+function _parser_add_field_number_integer(&$node, $field_name, $field_values, $fields, $instances, $fields_code, $page_url) {
   if (!is_array($field_values)) {
     $field_values = array($field_values);
   }
@@ -1024,7 +1030,7 @@ function _parser_add_field_number_integer(&$node, $field_name, $field_values, $f
 /**
  * Attach field type "list_text" to node object
  */
-function _parser_add_field_list_text(&$node, $field_name, $field_values, $fields, $instances, $node_fields_code, $page_url) {
+function _parser_add_field_list_text(&$node, $field_name, $field_values, $fields, $instances, $fields_code, $page_url) {
   if (!is_array($field_values)) {
     $field_values = array($field_values);
   }
@@ -1053,7 +1059,7 @@ function _parser_add_field_list_text(&$node, $field_name, $field_values, $fields
 /**
  * Attach field type "node_reference" to node object
  */
-function _parser_add_field_node_reference(&$node, $field_name, $field_values, $fields, $instances, $node_fields_code, $page_url) {
+function _parser_add_field_node_reference(&$node, $field_name, $field_values, $fields, $instances, $fields_code, $page_url) {
   if (!is_array($field_values)) {
     $field_values = array($field_values);
   }

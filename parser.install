@@ -43,7 +43,7 @@ function parser_schema() {
         'not null' => TRUE,
         'default' => 0,
       ),
-      'node_limit' => array(
+      'parse_limit' => array(
         'type' => 'int',
         'unsigned' => TRUE,
         'not null' => TRUE,
@@ -68,7 +68,7 @@ function parser_schema() {
         'not null' => TRUE,
         'default' => 0,
       ),
-      'no_update_nodes' => array(
+      'no_update' => array(
         'type' => 'int',
         'size' => 'tiny',
         'unsigned' => TRUE,
@@ -81,35 +81,29 @@ function parser_schema() {
         'not null' => TRUE,
         'default' => 'auto',
       ),
-      'site_charset_fix' => array(
+      'charset_fix' => array(
         'type' => 'int',
         'size' => 'tiny',
         'unsigned' => TRUE,
         'not null' => TRUE,
         'default' => 0,
       ),
-      'node_type' => array(
+      'bundle' => array(
         'type' => 'varchar',
         'length' => 20,
         'not null' => TRUE,
         'default' => '',
       ),
-      'node_language' => array(
-        'type' => 'varchar',
-        'length' => 3,
-        'not null' => TRUE,
-        'default' => 'und',
-      ),
-      'node_title_code' => array(
+      'label_code' => array(
         'type' => 'text',
         'not null' => TRUE,
       ),
-      'node_fields_code' => array(
+      'fields_code' => array(
         'type' => 'text',
         'not null' => TRUE,
         'serialize' => TRUE,
       ),
-      'node_prepare_code' => array(
+      'prepare_code' => array(
         'type' => 'text',
         'not null' => TRUE,
       ),
@@ -201,7 +195,7 @@ function parser_install() {
     'start_url' => 'http://drupal.org/project/themes',
     'test_url' => 'http://drupal.org/project/zen',
     'depth' => 1,
-    'node_limit' => 5,
+    'parse_limit' => 5,
     'white_list' => 'http://drupal.org/project/*',
     'black_list' => '' . 
       'http://drupal.org/project/issues/*' . "\n" .
@@ -213,13 +207,12 @@ function parser_install() {
       '  return TRUE;' . "\n" .
       '}',
     'site_charset' => 'auto',
-    'site_charset_fix' => 0,
-    'node_type' => 'article',
-    'node_language' => 'und',
+    'charset_fix' => 0,
+    'bundle' => 'article',
     'save_url' => 0,
-    'no_update_nodes' => 0,
-    'node_title_code' => 'return $doc->find(\'h1#page-subtitle\')->text();',
-    'node_fields_code' => array(
+    'no_update' => 0,
+    'label_code' => 'return $doc->find(\'h1#page-subtitle\')->text();',
+    'fields_code' => array(
       'body' => '' .
         '$content = $doc->find(\'.node-content\')->clone();' . "\n" .
         '$content->find(\'.all-attached-images\')->remove();' . "\n" .
@@ -233,100 +226,19 @@ function parser_install() {
         'return $terms;',
       'field_image' => 'return $doc->find(\'.image-thumbnail\')->attr(\'src\');',
     ),
-    'node_prepare_code' => '',
+    'prepare_code' => '',
   );
   entity_save('parser_job', $job);
-}
-
-/**
- * Add new col
- */
-function parser_update_7100() {
-  db_add_field('parser_jobs', 'save_url', array(
-    'type' => 'int',
-    'size' => 'tiny',
-    'unsigned' => TRUE,
-    'not null' => TRUE,
-    'default' => 0,
-  ));
-}
-
-/**
- * Add new col
- */
-function parser_update_7101() {
-  db_add_field('parser_jobs', 'site_charset', array(
-    'type' => 'varchar',
-    'length' => 20,
-    'not null' => TRUE,
-    'default' => 'auto',
-  ));
-}
-
-/**
- * Add new col
- */
-function parser_update_7102() {
-  db_add_field('parser_jobs', 'no_update_nodes', array(
-    'type' => 'int',
-    'size' => 'tiny',
-    'unsigned' => TRUE,
-    'not null' => TRUE,
-    'default' => 0,
-  ));
-}
-
-/**
- * Add new col
- */
-function parser_update_7103() {
-  db_add_field('parser_jobs', 'site_charset_fix', array(
-    'type' => 'int',
-    'size' => 'tiny',
-    'unsigned' => TRUE,
-    'not null' => TRUE,
-    'default' => 0,
-  ));
-}
-
-/**
- * Add new col
- */
-function parser_update_7104() {
-  db_drop_unique_key('parser_nodes', 'nid');
   
-  db_add_field('parser_nodes', 'jid', array(
-    'type' => 'int',
-    'unsigned' => TRUE,
-    'not null' => TRUE,
-    'default' => 0,
-  ));
+  foreach (array('public://parser_cache/html', 'public://parser_cache/files') as $directory) {
+    file_prepare_directory($directory, FILE_CREATE_DIRECTORY);
+  }
 }
 
 /**
- * Add new cols
+ * Implementation of hook_uninstall().
  */
-function parser_update_7105() {
-  db_add_field('parser_nodes', 'page_key', array(
-    'type' => 'varchar',
-    'length' => 255,
-    'not null' => TRUE,
-    'default' => '',
-  ));
-}
-
-/**
- * Add keys
- */
-function parser_update_7106() {
-  db_add_unique_key('parser_nodes', 'jid_nid', array('jid', 'nid'));
-}
-
-/**
- * Change keys
- */
-function parser_update_7107() {
-  db_drop_unique_key('parser_nodes', 'jid_nid');
-  db_add_primary_key('parser_nodes', array('jid', 'nid'));
+function parser_uninstall() {
+  file_unmanaged_delete_recursive('public://parser_cache');
 }
 

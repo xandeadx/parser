@@ -181,7 +181,7 @@ function parser_job_form($form, &$form_state, $job) {
     '#type' => 'fieldset',
     '#title' => 'Поля',
     '#description' => '
-      <p>Поля заполняются без обёртки кода в &lt;?php и ?&gt;. Во всех полях доступны две переменные $doc - объект phpQuery, $page - html код страницы, $page_url - адрес страницы без учёта
+      <p>Поля заполняются без обёртки кода в &lt;?php и ?&gt;. Во всех полях доступны три переменные $doc - объект phpQuery, $page - html код страницы, $page_url - адрес страницы без учёта
       редиректов. Оставьте textarea пустым, если поле заполнять не нужно.<p><p>Если появляются проблемы с кодировкой, то попробуйте сменить значение в поле <i>Кодировка сайта</i>, либо включите
       опцию <i>Передовать кодировку в конструктор phpQuery</i>, либо используйте функцию <a href="http://www.php.net/manual/ru/function.iconv.php" target="_blank">iconv()</a>, для ручной
       конвертации текста. Например: <code style="font-size:.9em;">return iconv(\'WINDOWS-1251\', \'UTF-8\', $doc->find(\'selector\')->text());</code></p>
@@ -352,7 +352,7 @@ function parser_job_form($form, &$form_state, $job) {
   $form['#attached']['library'][] = array('parser', 'codemirror');
   $form['#attached']['css'][] = $parser_path . '/parser.css';
   $form['#attached']['js'][] = $parser_path . '/parser.js';
-  
+
   return $form;
 }
 
@@ -380,13 +380,15 @@ function parser_job_form_submit(&$form, &$form_state) {
   $fields = field_info_fields();
   $fields_code = array();
   
-  foreach ($form_state['values']['fields_code'] as $fieldset) {
-    foreach ($fieldset as $field_name => $field_value) {
-      $fields_code[$field_name] = $field_value;
+  if (isset($form_state['values']['fields_code'])) {
+    foreach ($form_state['values']['fields_code'] as $fieldset) {
+      foreach ($fieldset as $field_name => $field_value) {
+        $fields_code[$field_name] = $field_value;
+      }
     }
+    $fields_code = array_diff($fields_code, array(''));
   }
   
-  $fields_code = array_diff($fields_code, array(''));
   $form_state['values']['fields_code'] = $fields_code;
   
   if (!$form_state['values']['parse_limit']) {
@@ -515,9 +517,14 @@ function parser_parse($job, &$context) {
       $context['results']['updated_entities']++;
     }
     // Create entity
-    else {
+    if (!$entity_id || !$entity) {
       $bundle_key = $entity_type_info['entity keys']['bundle'];
       $entity = entity_create($job->entity_type, array($bundle_key => $job->bundle));
+      
+      if ($job->entity_type == 'taxonomy_term') {
+        $entity->vid = taxonomy_vocabulary_machine_name_load($job->bundle)->vid;
+      }
+      
       $context['results']['created_entities']++;
     }
     
@@ -589,8 +596,8 @@ function parser_parse($job, &$context) {
   $context['message'] = '
     Завершён парсинг страницы <em>' . $page_url . '</em> с глубиной ' . $url->depth . '<br />
     Страниц в очереди: ' . ($context['sandbox']['max'] - $context['sandbox']['progress']) . '<br />
-    Создано нод: ' . $context['results']['created_entities'] . '<br />
-    Обновлено нод: ' . $context['results']['updated_entities'] . '<br />
+    Создано сущностей: ' . $context['results']['created_entities'] . '<br />
+    Обновлено сущностей: ' . $context['results']['updated_entities'] . '<br />
     Скачано страниц: ' . $context['results']['pages_from_http'] . '<br />
     Не удалось скачать страниц: ' . $context['results']['error_pages_from_http'] . '<br />
     Страниц взято из кэша: ' . $context['results']['pages_from_cache'] . '<br />

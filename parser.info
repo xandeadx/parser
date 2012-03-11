@@ -1,5 +1,5 @@
 name = Parser
-description = Parse html pages to nodes
+description = Parse sites to drupal content
 version = 7.x-1.x-dev
 core = 7.x
 dependencies[] = entity

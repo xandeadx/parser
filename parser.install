@@ -6,7 +6,7 @@
 function parser_schema() {
   $schema['parser_jobs'] = array(
     'fields' => array(
-      'id' => array(
+      'jid' => array(
         'type' => 'serial',
         'unsigned' => TRUE,
         'not null' => TRUE,
@@ -127,7 +127,7 @@ function parser_schema() {
         'description' => 'The name of the providing module if the entity has been defined in code.',
       ),
     ),
-    'primary key' => array('id'),
+    'primary key' => array('jid'),
   );
   
   $schema['parser_urls'] = array(
@@ -156,13 +156,13 @@ function parser_schema() {
   
   $schema['parser_map'] = array(
     'fields' => array(
-      'entity_id' => array(
+      'jid' => array(
         'type' => 'int',
         'unsigned' => TRUE,
         'not null' => TRUE,
         'default' => 0,
       ),
-      'jid' => array(
+      'entity_id' => array(
         'type' => 'int',
         'unsigned' => TRUE,
         'not null' => TRUE,
@@ -181,13 +181,7 @@ function parser_schema() {
         'default' => '',
       ),
     ),
-    'primary key' => array('entity_id'), 
-    'foreign keys' => array(
-      'node' => array(
-        'table' => 'node',
-        'columns' => array('entity_id' => 'nid'),
-      ),
-    ),
+    'primary key' => array('jid', 'entity_id'),
   );
   
   return $schema;

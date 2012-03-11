@@ -32,7 +32,7 @@ function parser_entity_info() {
       'controller class' => 'EntityAPIController',
       'base table' => 'parser_jobs',
       'entity keys' => array(
-        'id' => 'id',
+        'id' => 'jid',
         'label' => 'title'
       ),
       'admin ui' => array(
@@ -397,7 +397,7 @@ function parser_job_form_submit(&$form, &$form_state) {
   
   if ($form_state['clicked_button']['#value'] == $form_state['values']['submit']) {
     drupal_set_message('Задание сохранено.');
-    $form_state['redirect'] = 'admin/structure/parser_jobs/manage/' . $job->id;
+    $form_state['redirect'] = 'admin/structure/parser_jobs/manage/' . $job->jid;
   }
   else {
     // Clear vocabularies
@@ -435,7 +435,7 @@ function parser_parse($job, &$context) {
   if (empty($context['sandbox'])) {
     $context['sandbox']['progress'] = 0;
     $context['sandbox']['created_entities'] = 0;
-    $context['results']['jid'] = $job->id;
+    $context['results']['jid'] = $job->jid;
     $context['results']['time_start'] = time();
     $context['results']['created_entities'] = 0;
     $context['results']['updated_entities'] = 0;
@@ -452,7 +452,7 @@ function parser_parse($job, &$context) {
   $parsed_url = parse_url($page_url);
   $page = _parser_get_page_by_url($page_url, $job->site_charset, FALSE, $context['results']);
   $doc = _parser_create_phpquery($page, $job->charset_fix);
-  $entity_id = parser_get_entity_id_by_url($page_url, $job->id);
+  $entity_id = parser_get_entity_id_by_url($page_url, $job->jid);
   $page_key = '';
   
   // Find links
@@ -491,7 +491,7 @@ function parser_parse($job, &$context) {
     if ($allowed_parse && !is_bool($allowed_parse)) {
       $page_key = $allowed_parse;
       if (!$entity_id) {
-        $entity_id = parser_get_entity_id_by_page_key($page_key, $job->id);
+        $entity_id = parser_get_entity_id_by_page_key($page_key, $job->jid);
       }
     }
   }
@@ -538,7 +538,16 @@ function parser_parse($job, &$context) {
         if (!function_exists($function)) {
           $function = '_parser_add_field';
         }
-        $function($entity, $field_name, $result, $fields, $instances, $job->fields_code, $page_url, $context['results']);
+        $function(
+          $entity,
+          $field_name,
+          $result,
+          $job,
+          $fields[$field_name],
+          $instances[$job->entity_type][$job->bundle][$field_name],
+          $page_url,
+          $context['results']
+        );
       }
     }
     
@@ -556,14 +565,16 @@ function parser_parse($job, &$context) {
       }
       entity_save($job->entity_type, $entity);
       
+      $entity_id = entity_id($job->entity_type, $entity);
+      
       _parser_map_save(array(
-        'entity_id' => $entity->nid,
-        'jid' => $job->id,
+        'entity_id' => $entity_id,
+        'jid' => $job->jid,
         'url' => $page_url,
         'page_key' => $page_key,
       ));
     
-      $context['sandbox']['entity_ids'][] = $entity->nid;
+      $context['sandbox']['entity_ids'][] = $entity_id;
       $context['sandbox']['created_entities']++;
     }
   }
@@ -610,24 +621,36 @@ function parser_finished($success, $results, $operations) {
 }
 
 /**
- * Implements of hook_node_delete().
+ * Implements of hook_entity_delete().
  * Delete record from {parser_map} table
  */
-function parser_node_delete($node) {
+function parser_entity_delete($entity, $entity_type) {
+  $entity_id = entity_id($entity_type, $entity);
+    
+  $query = db_select('parser_map', 'pm');
+  $query->fields('pm', array('jid'));
+  $query->innerJoin('parser_jobs', 'pj', 'pj.jid = pm.jid');
+  $query->condition('pj.entity_type', $entity_type);
+  $query->condition('pm.entity_id', $entity_id);
+  $jid = $query->execute()->fetchField();
+    
   db_delete('parser_map')
-    ->condition('entity_id', $node->nid)
+    ->condition('jid', $jid)
+    ->condition('entity_id', $entity_id)
     ->execute();
 }
 
 /**
- * Implements of hook_node_view().
- * Show link to original page. Only admin.
+ * Implements of hook_entity_view().
+ * Show link to original page. Only for admin.
  */
-function parser_node_view($node, $view_mode, $langcode) {
-  if ($view_mode == 'full' && $GLOBALS['user']->uid == 1 && ($url = _parser_get_url_by_entity_id($node->nid))) {
-    $node->content['parser_url'] = array(
-      '#markup' => '<p>Материал спарсен со страницы ' . l($url, 'http://anonym.to/?' . $url, array('attributes' => array('target' => '_blank'))) . '</p>', 
-      '#weight' => 10, 
+function parser_entity_view($entity, $entity_type, $view_mode, $langcode) {
+  $entity_id = entity_id($entity_type, $entity);
+  
+  if ($view_mode == 'full' && $GLOBALS['user']->uid == 1 && ($url = _parser_get_url_by_entity_id($entity_id))) {
+    $entity->content['parser_url'] = array(
+      '#markup' => '<p>Контент спарсен со страницы ' . l($url, 'http://anonym.to/?' . $url, array('attributes' => array('target' => '_blank'))) . '</p>', 
+      '#weight' => 100, 
     );
   }
 }
@@ -656,18 +679,20 @@ function parser_check_code() {
  * Result page
  */
 function parser_result_page($job) {
+  $entity_info = entity_get_info($job->entity_type);
+  
   $query = db_select('parser_map', 'pn');
   $query->fields('pn', array('entity_id', 'url', 'page_key'));
   $query->fields('n', array('title'));
-  $query->leftJoin('node', 'n', 'pn.entity_id = n.nid');
-  $query->condition('jid', $job->id);
+  $query->leftJoin($entity_info['base table'], 'e', 'e.' . $entity_info['entity keys']['id'] . ' = pn.entity_id');
+  $query->condition('jid', $job->jid);
   $result = $query->execute();
   
   $rows = array();
   foreach ($result as $row) {
     $rows[] = array(
       l($row->url, $row->url),
-      l($row->title, 'node/' . $row->entity_id),
+      $row->title,
       $row->page_key,
     );
   }
@@ -744,18 +769,6 @@ function parser_get_entity_id_by_page_key($page_key, $jid = NULL) {
   }
   
   return $query->execute()->fetchField();
-}
-
-/**
- * Return entity id by entity label
- */
-function parser_get_entity_id_by_title($title) {
-  return db_select('node', 'n')
-    ->fields('n', array('entity_id'))
-    ->condition('title', $title)
-    ->range(0, 1)
-    ->execute()
-    ->fetchField();
 }
 
 /**
@@ -882,14 +895,14 @@ function _parser_get_page_by_url($url, $charset = 'auto', $skip_cache = FALSE, &
 /**
  * Attach field to entity object
  */
-function _parser_add_field(&$entity, $field_name, $field_value, $fields, $instances, $fields_code, $page_url) {
+function _parser_add_field(&$entity, $field_name, $field_value, $job, $field_info, $field_instance, $page_url) {
   $entity->{$field_name}[LANGUAGE_NONE] = $field_value;
 }
 
 /**
  * Attach field type "text" to entity object
  */
-function _parser_add_field_text(&$entity, $field_name, $field_values, $fields, $instances, $fields_code, $page_url) {
+function _parser_add_field_text(&$entity, $field_name, $field_values, $job, $field_info, $field_instance, $page_url) {
   if (!is_array($field_values)) {
     $field_values = array($field_values);
   }
@@ -900,14 +913,14 @@ function _parser_add_field_text(&$entity, $field_name, $field_values, $fields, $
   $i = 0;
   foreach ($field_values as $field_value) {
     $field_value = trim($field_value);
-    if (!empty($fields[$field_name]['settings']['max_length'])) {
-      $field_value = drupal_substr($field_value, 0, $fields[$field_name]['settings']['max_length']);
+    if (!empty($field_info['settings']['max_length'])) {
+      $field_value = drupal_substr($field_value, 0, $field_info['settings']['max_length']);
     }
     
     $entity->{$field_name}[LANGUAGE_NONE][$i]['value'] = $field_value;
   
-    if ($instances['node'][$entity->type][$field_name]['settings']['text_processing']) {
-      $entity->{$field_name}[LANGUAGE_NONE][$i]['format'] = $fields_code[$field_name . '_format'];
+    if ($field_instance['settings']['text_processing']) {
+      $entity->{$field_name}[LANGUAGE_NONE][$i]['format'] = $job->fields_code[$field_name . '_format'];
     }
     
     $i++;
@@ -917,14 +930,14 @@ function _parser_add_field_text(&$entity, $field_name, $field_values, $fields, $
 /**
  * Attach field type "text_with_summary" to entity object
  */
-function _parser_add_field_text_with_summary(&$entity, $field_name, $field_values, $fields, $instances, $fields_code, $page_url) {
-  _parser_add_field_text($entity, $field_name, $field_values, $fields, $instances, $fields_code, $page_url);
+function _parser_add_field_text_with_summary(&$entity, $field_name, $field_values, $job, $field_info, $field_instance, $page_url) {
+  _parser_add_field_text($entity, $field_name, $field_values, $job, $field_info, $field_instance, $page_url);
 }
 
 /**
  * Attach field type "file" to entity object
  */
-function _parser_add_field_file(&$entity, $field_name, $field_values, $fields, $instances, $fields_code, $page_url, &$results) {
+function _parser_add_field_file(&$entity, $field_name, $field_values, $job, $field_info, $field_instance, $page_url, &$results) {
   if (!$field_values) {
     return FALSE;
   }
@@ -933,7 +946,7 @@ function _parser_add_field_file(&$entity, $field_name, $field_values, $fields, $
   }
 
   $files = array();
-  $field_settings = $instances['node'][$entity->type][$field_name]['settings'];
+  $field_settings = $field_instance['settings'];
   $dest_dir = 'public://' . $field_settings['file_directory'];
   file_prepare_directory($dest_dir, FILE_CREATE_DIRECTORY);
   $allowed_file_extensions = explode(' ', $field_settings['file_extensions']);
@@ -1020,14 +1033,14 @@ function _parser_add_field_file(&$entity, $field_name, $field_values, $fields, $
 /**
  * Attach field type "image" to entity object
  */
-function _parser_add_field_image(&$entity, $field_name, $field_values, $fields, $instances, $fields_code, $page_url, &$results) {
-  _parser_add_field_file($entity, $field_name, $field_values, $fields, $instances, $fields_code, $page_url, $results);
+function _parser_add_field_image(&$entity, $field_name, $field_values, $job, $field_info, $field_instance, $page_url, &$results) {
+  _parser_add_field_file($entity, $field_name, $field_values, $job, $field_info, $field_instance, $page_url, $results);
 }
 
 /**
  * Attach field type "taxonomy_term_reference" to entity object
  */
-function _parser_add_field_taxonomy_term_reference(&$entity, $field_name, $field_values, $fields, $instances, $fields_code, $page_url) {
+function _parser_add_field_taxonomy_term_reference(&$entity, $field_name, $field_values, $job, $field_info, $field_instance, $page_url) {
   if (!is_array($field_values)) {
     $field_values = array($field_values);
   }
@@ -1035,7 +1048,7 @@ function _parser_add_field_taxonomy_term_reference(&$entity, $field_name, $field
     unset($entity->{$field_name});
   }
   
-  $voc_machine_name = $fields[$field_name]['settings']['allowed_values'][0]['vocabulary'];
+  $voc_machine_name = $field_info['settings']['allowed_values'][0]['vocabulary'];
   $voc = taxonomy_vocabulary_machine_name_load($voc_machine_name);
 
   foreach ($field_values as $term_name) {
@@ -1052,7 +1065,7 @@ function _parser_add_field_taxonomy_term_reference(&$entity, $field_name, $field
 /**
  * Attach field type "number_integer" to entity object
  */
-function _parser_add_field_number_integer(&$entity, $field_name, $field_values, $fields, $instances, $fields_code, $page_url) {
+function _parser_add_field_number_integer(&$entity, $field_name, $field_values, $job, $field_info, $field_instance, $page_url) {
   if (!is_array($field_values)) {
     $field_values = array($field_values);
   }
@@ -1067,7 +1080,7 @@ function _parser_add_field_number_integer(&$entity, $field_name, $field_values, 
 /**
  * Attach field type "list_text" to entity object
  */
-function _parser_add_field_list_text(&$entity, $field_name, $field_values, $fields, $instances, $fields_code, $page_url) {
+function _parser_add_field_list_text(&$entity, $field_name, $field_values, $job, $field_info, $field_instance, $page_url) {
   if (!is_array($field_values)) {
     $field_values = array($field_values);
   }
@@ -1075,7 +1088,7 @@ function _parser_add_field_list_text(&$entity, $field_name, $field_values, $fiel
     unset($entity->{$field_name});
   }
 
-  $allowed_values = $fields[$field_name]['settings']['allowed_values'];
+  $allowed_values = $field_info['settings']['allowed_values'];
   foreach ($field_values as $field_value) {
     $field_value = trim($field_value);
     
@@ -1096,7 +1109,7 @@ function _parser_add_field_list_text(&$entity, $field_name, $field_values, $fiel
 /**
  * Attach field type "node_reference" to entity object
  */
-function _parser_add_field_node_reference(&$entity, $field_name, $field_values, $fields, $instances, $fields_code, $page_url) {
+function _parser_add_field_node_reference(&$entity, $field_name, $field_values, $job, $field_info, $field_instance, $page_url) {
   if (!is_array($field_values)) {
     $field_values = array($field_values);
   }
@@ -1105,15 +1118,7 @@ function _parser_add_field_node_reference(&$entity, $field_name, $field_values, 
   }
 
   foreach ($field_values as $field_value) {
-    if (is_numeric($field_value)) {
-      $entity->{$field_name}[LANGUAGE_NONE][]['nid'] = $field_value;
-    }
-    else {
-      $nid = parser_get_entity_id_by_title(trim($field_value));
-      if ($nid) {
-        $entity->{$field_name}[LANGUAGE_NONE][]['nid'] = $nid;
-      }
-    }
+    $entity->{$field_name}[LANGUAGE_NONE][]['nid'] = (int)$field_value;
   }
 }
 

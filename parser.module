@@ -142,6 +142,7 @@ function parser_job_form($form, &$form_state, $job) {
     '#default_value' => isset($job->entity_type) ? $job->entity_type : 'node',
     '#required' => TRUE,
     '#ajax' => array('callback' => 'parser_job_form_entity_type_ajax_callback'),
+    '#disabled' => isset($job->jid) && db_select('parser_map')->condition('jid', $job->jid)->countQuery()->execute()->fetchField() ? TRUE : FALSE,
   );
   $entity_type_value = isset($form_state['values']['entity_type'])
     ? $form_state['values']['entity_type']
@@ -197,7 +198,7 @@ function parser_job_form($form, &$form_state, $job) {
   $form['fields_wrapper']['fields']['label_code_fieldset']['label_code'] = array(
     '#type' => 'textarea',
     '#title' => 'PHP код',
-    '#description' => 'PHP код, который должен вернуть заголовок ноды. Пример заполнения: <code>return $doc->find(\'h1\')->text();</code>',
+    '#description' => 'PHP код, который должен вернуть заголовок сущности. Пример заполнения: <code>return $doc->find(\'h1\')->text();</code>',
     '#default_value' => isset($job->label_code) ? $job->label_code : '',
     '#required' => TRUE,
     '#rows' => 3,
@@ -218,8 +219,8 @@ function parser_job_form($form, &$form_state, $job) {
   }
   $descriptions = array(
     'default'                 => 'PHP код, который должен вернуть значение поля.',
-    'file'                    => 'PHP код, который должен вернуть URL файла. Адрес может быть как абсолютный, так и относительный. Все файлы будут закачаны на текущий сервер, в директорию указанную в настройках поля. Пример заполнения: <code>return $doc->find(\'a.download-link\')->attr(\'href\');</code>',
-    'image'                   => 'PHP код, который должен вернуть URL картинки. Адрес может быть как абсолютный, так и относительный. Все картинки будут закачаны на текущий сервер, в директорию указанную в настройках поля. Пример заполнения: <code>return $doc->find(\'.cover img\')->attr(\'src\');</code>',
+    'file'                    => 'PHP код, который должен вернуть URL файла. Адрес может быть как абсолютный, так и относительный. Все файлы будут закачаны в директорию, указанную в настройках поля. Пример заполнения: <code>return $doc->find(\'a.download-link\')->attr(\'href\');</code>',
+    'image'                   => 'PHP код, который должен вернуть URL картинки. Адрес может быть как абсолютный, так и относительный. Все картинки будут закачаны в директорию, указанную в настройках поля. Пример заполнения: <code>return $doc->find(\'img.cover\')->attr(\'src\');</code>',
     'taxonomy_term_reference' => 'PHP код, который должен вернуть название термина, либо массив названий. Отсутствующие термины будут созданы автоматически. Пример заполнения:<br /><code>$terms = array();<br />foreach ($doc->find(\'.tags li\') as $li) $terms[] = pq($li)->text();<br />return $terms;</code>',
     'text_with_summary'       => 'PHP код, который должен вернуть значение поля. Пример заполнения: <code>return $doc->find(\'article.content\')->html();</code>',
     'list_text'               => 'PHP код, который должен вернуть либо ключ из списка допустимых значений, либо подпись. Если значения нет в списке допустимых, то оно будет проигнорированно. Пример заполнения: <code>return $doc->find(\'selector\')->text();</code>',

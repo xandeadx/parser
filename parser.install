@@ -88,6 +88,12 @@ function parser_schema() {
         'not null' => TRUE,
         'default' => 0,
       ),
+      'entity_type' => array(
+        'type' => 'varchar',
+        'length' => 20,
+        'not null' => TRUE,
+        'default' => '',
+      ),
       'bundle' => array(
         'type' => 'varchar',
         'length' => 20,
@@ -148,15 +154,15 @@ function parser_schema() {
     ),
   );
   
-  $schema['parser_nodes'] = array(
+  $schema['parser_map'] = array(
     'fields' => array(
-      'jid' => array(
+      'entity_id' => array(
         'type' => 'int',
         'unsigned' => TRUE,
         'not null' => TRUE,
         'default' => 0,
       ),
-      'nid' => array(
+      'jid' => array(
         'type' => 'int',
         'unsigned' => TRUE,
         'not null' => TRUE,
@@ -175,14 +181,15 @@ function parser_schema() {
         'default' => '',
       ),
     ),
-    'primary key' => array('jid', 'nid'), 
+    'primary key' => array('entity_id'), 
     'foreign keys' => array(
       'node' => array(
         'table' => 'node',
-        'columns' => array('nid' => 'nid'),
+        'columns' => array('entity_id' => 'nid'),
       ),
     ),
   );
+  
   return $schema;
 }
 
@@ -208,6 +215,7 @@ function parser_install() {
       '}',
     'site_charset' => 'auto',
     'charset_fix' => 0,
+    'entity_type' => 'node',
     'bundle' => 'article',
     'save_url' => 0,
     'no_update' => 0,
@@ -234,11 +242,3 @@ function parser_install() {
     file_prepare_directory($directory, FILE_CREATE_DIRECTORY);
   }
 }
-
-/**
- * Implementation of hook_uninstall().
- */
-function parser_uninstall() {
-  file_unmanaged_delete_recursive('public://parser_cache');
-}
-

@@ -9,7 +9,7 @@
         var params = {
           test_url: $('#edit-test-url').val(),
           site_charset: $('#edit-site-charset').val(),
-          site_charset_fix: $('#edit-site-charset-fix').attr('checked') ? 1 : 0,
+          charset_fix: $('#edit-charset-fix').attr('checked') ? 1 : 0,
           field_name: $textarea.attr('name'),
           field_value: $textarea.val()
         };

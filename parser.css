@@ -22,9 +22,3 @@ input.check-button {
   height: auto;
   min-height: 5em;
 }
-
-.ajax-progress-throbber,
-.ajax-progress-throbber div {
-  float: none;
-  display: inline;
-}

@@ -516,12 +516,11 @@ function parser_parse($job, &$context) {
     // Create entity
     else {
       $bundle_key = $entity_type_info['entity keys']['bundle'];
-      $entity = new stdClass();
-      $entity->{$bundle_key} = $job->bundle;
-      $entity->language = LANGUAGE_NONE;
+      $entity = entity_create($job->entity_type, array($bundle_key => $job->bundle));
       $context['results']['created_entities']++;
     }
     
+    // Populate label
     $label_key = $entity_type_info['entity keys']['label'];
     $entity->{$label_key} = trim(eval($job->label_code));
     if (!$entity->{$label_key}) {

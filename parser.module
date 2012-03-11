@@ -550,8 +550,7 @@ function parser_parse($job, &$context) {
           'language' => LANGUAGE_NONE,
         );
       }
-    
-      node_object_prepare($entity);
+      
       if ($job->prepare_code) {
         eval($job->prepare_code);
       }

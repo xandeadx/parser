@@ -622,8 +622,8 @@ function parser_finished($success, $results, $operations) {
     ' . ($success ? 'Парсинг закончен' : 'Парсинг закончился с ошибками') . '.
     Обработано страниц: ' . _parser_url_count(TRUE) . '.
     Не удалось скачать страниц: ' . $results['error_pages_from_http'] . '.
-    Создано нод: ' . l($results['created_entities'], 'admin/structure/parser_jobs/results/' . $results['jid']) . '.
-    Обновлено нод: ' . l($results['updated_entities'], 'admin/structure/parser_jobs/results/' . $results['jid']) . '.
+    Создано сущностей: ' . l($results['created_entities'], 'admin/structure/parser_jobs/results/' . $results['jid']) . '.
+    Обновлено сущностей: ' . l($results['updated_entities'], 'admin/structure/parser_jobs/results/' . $results['jid']) . '.
     Скачано файлов: ' . $results['downloaded_files'] . '.
     Затрачено времени: ' . gmdate('H:i:s', time() - $results['time_start']) . '.
     ' . l('Посмотреть системный журнал', 'admin/reports/dblog') . '
@@ -690,11 +690,12 @@ function parser_check_code() {
  */
 function parser_result_page($job) {
   $entity_info = entity_get_info($job->entity_type);
+  $label_key = $entity_info['entity keys']['label'];
   
-  $query = db_select('parser_map', 'pn');
-  $query->fields('pn', array('entity_id', 'url', 'page_key'));
-  $query->fields('n', array('title'));
-  $query->leftJoin($entity_info['base table'], 'e', 'e.' . $entity_info['entity keys']['id'] . ' = pn.entity_id');
+  $query = db_select('parser_map', 'pm');
+  $query->fields('pm', array('entity_id', 'url', 'page_key'));
+  $query->fields('e', array($label_key));
+  $query->innerJoin($entity_info['base table'], 'e', 'e.' . $entity_info['entity keys']['id'] . ' = pm.entity_id');
   $query->condition('jid', $job->jid);
   $result = $query->execute();
   
@@ -702,13 +703,13 @@ function parser_result_page($job) {
   foreach ($result as $row) {
     $rows[] = array(
       l($row->url, $row->url),
-      $row->title,
+      $row->{$label_key},
       $row->page_key,
     );
   }
     
   return theme('table', array(
-    'header' => array('URL', t('Title'), t('Identifier')),
+    'header' => array('URL', t('Label'), t('Identifier')),
     'rows' => $rows,
     'empty' => 'Пусто...',
   ));

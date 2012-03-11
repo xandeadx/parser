@@ -189,14 +189,14 @@ function parser_job_form($form, &$form_state, $job) {
   
   $form['fields_wrapper']['fields']['label_code_fieldset'] = array(
     '#type' => 'fieldset',
-    '#title' => 'title',
+    '#title' => $entity_types[$entity_type_value]['entity keys']['label'],
     '#collapsible' => TRUE,
     '#collapsed' => TRUE,
   );
   
   $form['fields_wrapper']['fields']['label_code_fieldset']['label_code'] = array(
     '#type' => 'textarea',
-    '#title' => 'title',
+    '#title' => 'PHP код',
     '#description' => 'PHP код, который должен вернуть заголовок ноды. Пример заполнения: <code>return $doc->find(\'h1\')->text();</code>',
     '#default_value' => isset($job->label_code) ? $job->label_code : '',
     '#required' => TRUE,
@@ -453,6 +453,7 @@ function parser_parse($job, &$context) {
   $page = _parser_get_page_by_url($page_url, $job->site_charset, FALSE, $context['results']);
   $doc = _parser_create_phpquery($page, $job->charset_fix);
   $entity_id = parser_get_entity_id_by_url($page_url, $job->jid);
+  $entity_type_info = entity_get_info($job->entity_type);
   $page_key = '';
   
   // Find links
@@ -514,15 +515,17 @@ function parser_parse($job, &$context) {
     }
     // Create entity
     else {
+      $bundle_key = $entity_type_info['entity keys']['bundle'];
       $entity = new stdClass();
-      $entity->type = $job->bundle;
+      $entity->{$bundle_key} = $job->bundle;
       $entity->language = LANGUAGE_NONE;
       $context['results']['created_entities']++;
     }
     
-    $entity->title = trim(eval($job->label_code));
-    if (!$entity->title) {
-      $entity->title = 'No Title';
+    $label_key = $entity_type_info['entity keys']['label'];
+    $entity->{$label_key} = trim(eval($job->label_code));
+    if (!$entity->{$label_key}) {
+      $entity->{$label_key} = 'No ' . $label_key;
     }
     
     // Populate fields

@@ -188,22 +188,24 @@ function parser_job_form($form, &$form_state, $job) {
     ',
   );
   
-  $form['fields_wrapper']['fields']['label_code_fieldset'] = array(
-    '#type' => 'fieldset',
-    '#title' => $entity_types[$entity_type_value]['entity keys']['label'],
-    '#collapsible' => TRUE,
-    '#collapsed' => TRUE,
-  );
-  
-  $form['fields_wrapper']['fields']['label_code_fieldset']['label_code'] = array(
-    '#type' => 'textarea',
-    '#title' => 'PHP код',
-    '#description' => 'PHP код, который должен вернуть заголовок сущности. Пример заполнения: <code>return $doc->find(\'h1\')->text();</code>',
-    '#default_value' => isset($job->label_code) ? $job->label_code : '',
-    '#required' => TRUE,
-    '#rows' => 3,
-    '#resizable' => FALSE,
-  ) + $check_button;
+  if (isset($entity_types[$entity_type_value]['entity keys']['label'])) {
+    $form['fields_wrapper']['fields']['label_code_fieldset'] = array(
+      '#type' => 'fieldset',
+      '#title' => $entity_types[$entity_type_value]['entity keys']['label'],
+      '#collapsible' => TRUE,
+      '#collapsed' => TRUE,
+    );
+    
+    $form['fields_wrapper']['fields']['label_code_fieldset']['label_code'] = array(
+      '#type' => 'textarea',
+      '#title' => 'PHP код',
+      '#description' => 'PHP код, который должен вернуть заголовок сущности. Пример заполнения: <code>return $doc->find(\'h1\')->text();</code>',
+      '#default_value' => isset($job->label_code) ? $job->label_code : '',
+      '#required' => TRUE,
+      '#rows' => 3,
+      '#resizable' => FALSE,
+    ) + $check_button;
+  }
   
   $form['fields_wrapper']['fields']['fields_code'] = array(
     '#tree' => TRUE,
@@ -516,10 +518,9 @@ function parser_parse($job, &$context) {
       $entity = current(entity_load($job->entity_type, array($entity_id)));
       $context['results']['updated_entities']++;
     }
-    // Create entity
+    // Create entity object
     if (!$entity_id || !$entity) {
-      $bundle_key = $entity_type_info['entity keys']['bundle'];
-      $entity = entity_create($job->entity_type, array($bundle_key => $job->bundle));
+      $entity = entity_create($job->entity_type, array($entity_type_info['entity keys']['bundle'] => $job->bundle));
       
       if ($job->entity_type == 'taxonomy_term') {
         $entity->vid = taxonomy_vocabulary_machine_name_load($job->bundle)->vid;
@@ -529,10 +530,12 @@ function parser_parse($job, &$context) {
     }
     
     // Populate label
-    $label_key = $entity_type_info['entity keys']['label'];
-    $entity->{$label_key} = trim(eval($job->label_code));
-    if (!$entity->{$label_key}) {
-      $entity->{$label_key} = 'No ' . $label_key;
+    if (isset($entity_type_info['entity keys']['label']) && $job->label_code) {
+      $label_key = $entity_type_info['entity keys']['label'];
+      $entity->{$label_key} = trim(eval($job->label_code));
+      if (!$entity->{$label_key}) {
+        $entity->{$label_key} = 'No ' . $label_key;
+      }
     }
     
     // Populate fields
@@ -709,7 +712,7 @@ function parser_result_page($job) {
   }
     
   return theme('table', array(
-    'header' => array('URL', t('Label'), t('Identifier')),
+    'header' => array('URL', $label_key, t('Identifier')),
     'rows' => $rows,
     'empty' => 'Пусто...',
   ));

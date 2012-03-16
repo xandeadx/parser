@@ -65,7 +65,43 @@ function parser_job_load($id) {
  */
 function parser_job_form($form, &$form_state, $job) {
   $check_button = array('#field_prefix' => '<input type="button" value="проверить" class="form-submit check-button" />');
-    
+  $fields_code = isset($job->fields_code) ? $job->fields_code : array();
+  $entity_types = entity_get_info();
+  $fields = field_info_fields();
+  $formats = filter_formats();
+  
+  $entity_type_options = array();
+  foreach ($entity_types as $entity_type => $entity_info) {
+    $entity_type_options[$entity_type] = $entity_info['label'];
+  }
+  
+  $entity_type_value = isset($job->entity_type) ? $job->entity_type : 'node';
+  if (isset($form_state['values']['entity_type'])) {
+    $entity_type_value = $form_state['values']['entity_type'];
+  }
+  
+  $bundle_options = array();
+  foreach ($entity_types[$entity_type_value]['bundles'] as $bundle_name => $bundle_info) {
+    $bundle_options[$bundle_name] = $bundle_info['label'];
+  }
+  
+  $bundle_value = isset($job->bundle) ? $job->bundle : key($bundle_options);
+  if (isset($form_state['values']['bundle']) && isset($bundle_options[$form_state['values']['bundle']])) {
+    $bundle_value = $form_state['values']['bundle'];
+  }
+  
+  $bundle_key = $entity_types[$entity_type_value]['entity keys']['bundle'];
+  
+  $entity_properties = entity_get_property_info($entity_type_value);
+  if ($entity_type_value == 'taxonomy_term') {
+    unset($entity_properties['properties']['vocabulary']);
+  }
+  if (isset($entity_properties['properties'][$bundle_key])) {
+    unset($entity_properties['properties'][$bundle_key]);
+  }
+  
+  $instances = field_info_instances($entity_type_value, $bundle_value);
+  
   $form['title'] = array(
     '#type' => 'textfield',
     '#title' => 'Название задания',
@@ -129,11 +165,6 @@ function parser_job_form($form, &$form_state, $job) {
   ) + $check_button;
   
   // Entity type
-  $entity_types = entity_get_info();
-  $entity_type_options = array();
-  foreach ($entity_types as $entity_type => $entity_info) {
-    $entity_type_options[$entity_type] = $entity_info['label'];
-  }
   $form['entity_type'] = array(
     '#type' => 'select',
     '#title' => 'Сущность',
@@ -144,18 +175,11 @@ function parser_job_form($form, &$form_state, $job) {
     '#ajax' => array('callback' => 'parser_job_form_entity_type_ajax_callback'),
     '#disabled' => isset($job->jid) && db_select('parser_map')->condition('jid', $job->jid)->countQuery()->execute()->fetchField() ? TRUE : FALSE,
   );
-  $entity_type_value = isset($form_state['values']['entity_type'])
-    ? $form_state['values']['entity_type']
-    : $form['entity_type']['#default_value'];
   
   // Bundle
-  $bundle_options = array();
-  foreach ($entity_types[$entity_type_value]['bundles'] as $bundle_name => $bundle_info) {
-    $bundle_options[$bundle_name] = $bundle_info['label'];
-  }
   $form['bundle'] = array(
     '#type' => 'select',
-    '#title' => 'Тип',
+    '#title' => 'Тип (bundle)',
     '#description' => 'Выберите тип сущности, который будет создавать парсер.',
     '#options' => $bundle_options,
     '#default_value' => isset($job->bundle) ? $job->bundle : key($bundle_options),
@@ -167,17 +191,13 @@ function parser_job_form($form, &$form_state, $job) {
       'wrapper' => 'fields-code-wrapper',
     ),
   );
-  $bundle_value = (isset($form_state['values']['bundle']) && isset($bundle_options[$form_state['values']['bundle']]))
-    ? $form_state['values']['bundle']
-    : $form['bundle']['#default_value'];
   
-  // Fields
   $form['fields_wrapper'] = array(
     '#prefix' => '<div id="fields-code-wrapper">',
     '#suffix' => '</div>',
   );
   
-  $form['fields_wrapper']['fields'] = array(
+  $form['fields_wrapper']['fields_code'] = array(
     '#type' => 'fieldset',
     '#title' => 'Поля',
     '#description' => '
@@ -186,35 +206,35 @@ function parser_job_form($form, &$form_state, $job) {
       опцию <i>Передовать кодировку в конструктор phpQuery</i>, либо используйте функцию <a href="http://www.php.net/manual/ru/function.iconv.php" target="_blank">iconv()</a>, для ручной
       конвертации текста. Например: <code style="font-size:.9em;">return iconv(\'WINDOWS-1251\', \'UTF-8\', $doc->find(\'selector\')->text());</code></p>
     ',
+    '#tree' => TRUE,
   );
   
-  if (isset($entity_types[$entity_type_value]['entity keys']['label'])) {
-    $form['fields_wrapper']['fields']['label_code_fieldset'] = array(
+  // Properties
+  foreach ($entity_properties['properties'] as $property_name => $property_info) {
+    if (!empty($property_info['computed']) || !empty($property_info['field'])) {
+      continue;
+    }
+    
+    $form['fields_wrapper']['fields_code'][$property_name . '_fieldset'] = array(
       '#type' => 'fieldset',
-      '#title' => $entity_types[$entity_type_value]['entity keys']['label'],
+      '#title' => $property_info['label'] . ' (' . $property_name . ')',
+      '#description' => isset($property_info['description']) ? $property_info['description'] : '',
       '#collapsible' => TRUE,
       '#collapsed' => TRUE,
     );
     
-    $form['fields_wrapper']['fields']['label_code_fieldset']['label_code'] = array(
+    $form['fields_wrapper']['fields_code'][$property_name . '_fieldset'][$property_name] = array(
       '#type' => 'textarea',
       '#title' => 'PHP код',
-      '#description' => 'PHP код, который должен вернуть заголовок сущности. Пример заполнения: <code>return $doc->find(\'h1\')->text();</code>',
-      '#default_value' => isset($job->label_code) ? $job->label_code : '',
-      '#required' => TRUE,
+      '#description' => 'PHP код, который должен вернуть значение поля' . (isset($property_info['type']) ? ' (тип: ' . $property_info['type'] . ')' : ''),
+      '#default_value' => isset($fields_code[$property_name]) ? $fields_code[$property_name] : '',
       '#rows' => 3,
       '#resizable' => FALSE,
+      '#required' => !empty($property_info['required']),
     ) + $check_button;
   }
   
-  $form['fields_wrapper']['fields']['fields_code'] = array(
-    '#tree' => TRUE,
-  );
-
-  $fields = field_info_fields();
-  $instances = field_info_instances();
-  $fields_code = isset($job->fields_code) ? $job->fields_code : array();
-  $formats = filter_formats();
+  // Fields
   $format_options = array();
   foreach ($formats as $format) {
     $format_options[$format->format] = $format->name;
@@ -224,7 +244,7 @@ function parser_job_form($form, &$form_state, $job) {
     'file'                    => 'PHP код, который должен вернуть URL файла. Адрес может быть как абсолютный, так и относительный. Все файлы будут закачаны в директорию, указанную в настройках поля. Пример заполнения: <code>return $doc->find(\'a.download-link\')->attr(\'href\');</code>',
     'image'                   => 'PHP код, который должен вернуть URL картинки. Адрес может быть как абсолютный, так и относительный. Все картинки будут закачаны в директорию, указанную в настройках поля. Пример заполнения: <code>return $doc->find(\'img.cover\')->attr(\'src\');</code>',
     'taxonomy_term_reference' => 'PHP код, который должен вернуть название термина, либо массив названий. Отсутствующие термины будут созданы автоматически. Пример заполнения:<br /><code>$terms = array();<br />foreach ($doc->find(\'.tags li\') as $li) $terms[] = pq($li)->text();<br />return $terms;</code>',
-    'text_with_summary'       => 'PHP код, который должен вернуть значение поля. Пример заполнения: <code>return $doc->find(\'article.content\')->html();</code>',
+    'text_with_summary'       => 'PHP код, который должен вернуть значение поля. Пример заполнения: <code>return $doc->find(\'article .content\')->html();</code>',
     'list_text'               => 'PHP код, который должен вернуть либо ключ из списка допустимых значений, либо подпись. Если значения нет в списке допустимых, то оно будет проигнорированно. Пример заполнения: <code>return $doc->find(\'selector\')->text();</code>',
     'node_reference'          => 'PHP код, который должен вернуть либо nid материала, либо его заголовок (не рекомендуется). Чтобы получить nid материала по идентификатору страницы, воспользуйтесь функцией parser_get_entity_id_by_page_key($page_key)',
   );
@@ -234,28 +254,32 @@ function parser_job_form($form, &$form_state, $job) {
       continue;
     }
       
+    $instance = $instances[$field_name];
+    $property_info = $entity_properties['bundles'][$bundle_value]['properties'][$field_name];
     $description = isset($descriptions[$field['type']]) ? $descriptions[$field['type']] : $descriptions['default'];
-    $description .= !function_exists('_parser_add_field_' . $field['type']) ? ' <span style="color:red;">Тип поля не поддерживается, это значит что код должен вернуть структуру поля. Например: <code>return array(0 => array(\'value\' => $doc->find(\'#some-id\')->text()));</code></span>' : '';
+    $description .= !function_exists('_parser_attach_field_' . $field['type']) ? ' <span style="color:red;">Тип поля не поддерживается, это значит что код должен вернуть структуру поля. Например: <code>return array(0 => array(\'value\' => $doc->find(\'#some-id\')->text()));</code></span>' : '';
     $fieldset_name = $field_name . '_fieldset';
     
-    $form['fields_wrapper']['fields']['fields_code'][$fieldset_name] = array(
+    $form['fields_wrapper']['fields_code'][$fieldset_name] = array(
       '#type' => 'fieldset',
-      '#title' => $field_name,
+      '#title' => $instance['label'] . ' (' . $field_name . ')',
+      '#description' => $property_info['description'],
       '#collapsible' => TRUE,
       '#collapsed' => TRUE,
     );
   
-    $form['fields_wrapper']['fields']['fields_code'][$fieldset_name][$field_name] = array(
+    $form['fields_wrapper']['fields_code'][$fieldset_name][$field_name] = array(
       '#type' => 'textarea',
       '#title' => 'PHP код',
       '#description' => $description,
       '#default_value' => isset($fields_code[$field_name]) ? $fields_code[$field_name] : '',
       '#rows' => 3,
       '#resizable' => FALSE,
+      '#required' => $property_info['required'],
     ) + $check_button;
 
-    if (!empty($instances[$entity_type_value][$bundle_value][$field_name]['settings']['text_processing'])) {
-      $form['fields_wrapper']['fields']['fields_code'][$fieldset_name][$field_name . '_format'] = array(
+    if (!empty($instance['settings']['text_processing'])) {
+      $form['fields_wrapper']['fields_code'][$fieldset_name][$field_name . '_format'] = array(
         '#type' => 'select',
         '#title' => 'Формат текста',
         '#description' => 'Формат текста, который будет установлен для поля.',
@@ -265,7 +289,7 @@ function parser_job_form($form, &$form_state, $job) {
     }
     
     if ($field['type'] == 'taxonomy_term_reference') {
-      $form['fields_wrapper']['fields']['fields_code'][$fieldset_name][$field_name . '_clear_voc'] = array(
+      $form['fields_wrapper']['fields_code'][$fieldset_name][$field_name . '_clear_voc'] = array(
         '#type' => 'checkbox',
         '#title' => 'Очистить словарь перед парсингом.',
       );
@@ -384,13 +408,12 @@ function parser_job_form_submit(&$form, &$form_state) {
   
   if (isset($form_state['values']['fields_code'])) {
     foreach ($form_state['values']['fields_code'] as $fieldset) {
-      foreach ($fieldset as $field_name => $field_value) {
-        $fields_code[$field_name] = $field_value;
+      foreach ($fieldset as $field_name => $field_code) {
+        $fields_code[$field_name] = $field_code;
       }
     }
     $fields_code = array_diff($fields_code, array(''));
   }
-  
   $form_state['values']['fields_code'] = $fields_code;
   
   if (!$form_state['values']['parse_limit']) {
@@ -461,8 +484,8 @@ function parser_parse($job, &$context) {
   $entity_type_info = entity_get_info($job->entity_type);
   $page_key = '';
   
-  // Find links
   if ($url->depth < $job->depth) {
+    // Find links
     foreach ($doc->find('a') as $a) {
       $href = pq($a)->attr('href');
       $href = _parser_get_full_url($href, $page_url);
@@ -511,7 +534,8 @@ function parser_parse($job, &$context) {
   // Parse page
   if ($allowed_parse) {
     $fields = field_info_fields();
-    $instances = field_info_instances();
+    $instances = field_info_instances($job->entity_type, $job->bundle);
+    $entity_properties = entity_get_property_info($job->entity_type);
     
     // Load entity
     if ($entity_id) {
@@ -529,27 +553,21 @@ function parser_parse($job, &$context) {
       $context['results']['created_entities']++;
     }
     
-    // Populate label
-    if (isset($entity_type_info['entity keys']['label']) && $job->label_code) {
-      $label_key = $entity_type_info['entity keys']['label'];
-      $entity->{$label_key} = trim(eval($job->label_code));
-      if (!$entity->{$label_key}) {
-        $entity->{$label_key} = 'No ' . $label_key;
-      }
-    }
+    $entity_wrapper = entity_metadata_wrapper($job->entity_type, $entity);
     
     // Populate fields
     foreach ($job->fields_code as $field_name => $php_code) {
-      if (isset($fields[$field_name])) {
-        $result = eval($php_code);
-        
-        if (!$entity) {
-          break;
-        }
-        
-        $function = '_parser_add_field_' . $fields[$field_name]['type'];
+      if (!$php_code || (!isset($instances[$field_name]) && !isset($entity_properties['properties'][$field_name]))) {
+        continue;
+      }
+      
+      $result = eval($php_code);
+      
+      // Is field
+      if (isset($instances[$field_name])) {
+        $function = '_parser_attach_field_' . $fields[$field_name]['type'];
         if (!function_exists($function)) {
-          $function = '_parser_add_field';
+          $function = '_parser_attach_field';
         }
         $function(
           $entity,
@@ -557,10 +575,14 @@ function parser_parse($job, &$context) {
           $result,
           $job,
           $fields[$field_name],
-          $instances[$job->entity_type][$job->bundle][$field_name],
+          $instances[$field_name],
           $page_url,
           $context['results']
         );
+      }
+      // Is property
+      else {
+        $entity_wrapper->{$field_name} = $result;
       }
     }
     
@@ -909,14 +931,14 @@ function _parser_get_page_by_url($url, $charset = 'auto', $skip_cache = FALSE, &
 /**
  * Attach field to entity object
  */
-function _parser_add_field(&$entity, $field_name, $field_value, $job, $field_info, $field_instance, $page_url) {
+function _parser_attach_field(&$entity, $field_name, $field_value, $job, $field_info, $field_instance, $page_url) {
   $entity->{$field_name}[LANGUAGE_NONE] = $field_value;
 }
 
 /**
  * Attach field type "text" to entity object
  */
-function _parser_add_field_text(&$entity, $field_name, $field_values, $job, $field_info, $field_instance, $page_url) {
+function _parser_attach_field_text(&$entity, $field_name, $field_values, $job, $field_info, $field_instance, $page_url) {
   if (!is_array($field_values)) {
     $field_values = array($field_values);
   }
@@ -944,14 +966,14 @@ function _parser_add_field_text(&$entity, $field_name, $field_values, $job, $fie
 /**
  * Attach field type "text_with_summary" to entity object
  */
-function _parser_add_field_text_with_summary(&$entity, $field_name, $field_values, $job, $field_info, $field_instance, $page_url) {
-  _parser_add_field_text($entity, $field_name, $field_values, $job, $field_info, $field_instance, $page_url);
+function _parser_attach_field_text_with_summary(&$entity, $field_name, $field_values, $job, $field_info, $field_instance, $page_url) {
+  _parser_attach_field_text($entity, $field_name, $field_values, $job, $field_info, $field_instance, $page_url);
 }
 
 /**
  * Attach field type "file" to entity object
  */
-function _parser_add_field_file(&$entity, $field_name, $field_values, $job, $field_info, $field_instance, $page_url, &$results) {
+function _parser_attach_field_file(&$entity, $field_name, $field_values, $job, $field_info, $field_instance, $page_url, &$results) {
   if (!$field_values) {
     return FALSE;
   }
@@ -1047,14 +1069,14 @@ function _parser_add_field_file(&$entity, $field_name, $field_values, $job, $fie
 /**
  * Attach field type "image" to entity object
  */
-function _parser_add_field_image(&$entity, $field_name, $field_values, $job, $field_info, $field_instance, $page_url, &$results) {
-  _parser_add_field_file($entity, $field_name, $field_values, $job, $field_info, $field_instance, $page_url, $results);
+function _parser_attach_field_image(&$entity, $field_name, $field_values, $job, $field_info, $field_instance, $page_url, &$results) {
+  _parser_attach_field_file($entity, $field_name, $field_values, $job, $field_info, $field_instance, $page_url, $results);
 }
 
 /**
  * Attach field type "taxonomy_term_reference" to entity object
  */
-function _parser_add_field_taxonomy_term_reference(&$entity, $field_name, $field_values, $job, $field_info, $field_instance, $page_url) {
+function _parser_attach_field_taxonomy_term_reference(&$entity, $field_name, $field_values, $job, $field_info, $field_instance, $page_url) {
   if (!is_array($field_values)) {
     $field_values = array($field_values);
   }
@@ -1079,7 +1101,7 @@ function _parser_add_field_taxonomy_term_reference(&$entity, $field_name, $field
 /**
  * Attach field type "number_integer" to entity object
  */
-function _parser_add_field_number_integer(&$entity, $field_name, $field_values, $job, $field_info, $field_instance, $page_url) {
+function _parser_attach_field_number_integer(&$entity, $field_name, $field_values, $job, $field_info, $field_instance, $page_url) {
   if (!is_array($field_values)) {
     $field_values = array($field_values);
   }
@@ -1094,7 +1116,7 @@ function _parser_add_field_number_integer(&$entity, $field_name, $field_values, 
 /**
  * Attach field type "list_text" to entity object
  */
-function _parser_add_field_list_text(&$entity, $field_name, $field_values, $job, $field_info, $field_instance, $page_url) {
+function _parser_attach_field_list_text(&$entity, $field_name, $field_values, $job, $field_info, $field_instance, $page_url) {
   if (!is_array($field_values)) {
     $field_values = array($field_values);
   }
@@ -1123,7 +1145,7 @@ function _parser_add_field_list_text(&$entity, $field_name, $field_values, $job,
 /**
  * Attach field type "node_reference" to entity object
  */
-function _parser_add_field_node_reference(&$entity, $field_name, $field_values, $job, $field_info, $field_instance, $page_url) {
+function _parser_attach_field_node_reference(&$entity, $field_name, $field_values, $job, $field_info, $field_instance, $page_url) {
   if (!is_array($field_values)) {
     $field_values = array($field_values);
   }
@@ -1244,4 +1266,13 @@ function _parser_clear_vocabulary($vocabulary_name) {
 function _parser_create_phpquery($html, $charset_fix = FALSE) {
   require_once('phpQuery/phpQuery/phpQuery.php');
   return phpQuery::newDocumentHTML($html, $charset_fix ? 'utf8' : NULL);
+}
+
+/**
+ * Return TRUE if $name is entity field
+ */
+function _parser_is_entity_field($name, $instance) {
+  /*if ($entity_properties[]) {
+    
+  }*/
 }

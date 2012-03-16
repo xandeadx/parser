@@ -100,10 +100,6 @@ function parser_schema() {
         'not null' => TRUE,
         'default' => '',
       ),
-      'label_code' => array(
-        'type' => 'text',
-        'not null' => TRUE,
-      ),
       'fields_code' => array(
         'type' => 'text',
         'not null' => TRUE,

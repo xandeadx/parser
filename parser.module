@@ -38,6 +38,7 @@ function parser_entity_info() {
       'admin ui' => array(
         'path' => 'admin/structure/parser_jobs'
       ),
+      'uri callback' => 'parser_job_uri',
       'access callback' => 'parser_job_access',
       'module' => 'parser',
       'exportable' => TRUE,
@@ -58,6 +59,15 @@ function parser_job_access($op, $entity, $account = NULL, $entity_type = 'parser
 function parser_job_load($id) {
   $result = entity_load('parser_job', array($id));
   return $result ? reset($result) : FALSE;
+}
+
+/**
+ * Parser job uri callback
+ */
+function parser_job_uri($job) {
+  return array(
+    'path' => 'admin/structure/parser_jobs/manage/' . $job->jid,
+  );
 }
 
 /**
@@ -100,7 +110,12 @@ function parser_job_form($form, &$form_state, $job) {
     unset($entity_properties['properties'][$bundle_key]);
   }
   
-  $instances = field_info_instances($entity_type_value, $bundle_value);
+  $fields_instances = field_info_instances($entity_type_value, $bundle_value);
+  
+  $format_options = array();
+  foreach ($formats as $format) {
+    $format_options[$format->format] = $format->name;
+  }
   
   $form['title'] = array(
     '#type' => 'textfield',
@@ -235,10 +250,6 @@ function parser_job_form($form, &$form_state, $job) {
   }
   
   // Fields
-  $format_options = array();
-  foreach ($formats as $format) {
-    $format_options[$format->format] = $format->name;
-  }
   $descriptions = array(
     'default'                 => 'PHP код, который должен вернуть значение поля.',
     'file'                    => 'PHP код, который должен вернуть URL файла. Адрес может быть как абсолютный, так и относительный. Все файлы будут закачаны в директорию, указанную в настройках поля. Пример заполнения: <code>return $doc->find(\'a.download-link\')->attr(\'href\');</code>',
@@ -254,7 +265,7 @@ function parser_job_form($form, &$form_state, $job) {
       continue;
     }
       
-    $instance = $instances[$field_name];
+    $field_instance = $fields_instances[$field_name];
     $property_info = $entity_properties['bundles'][$bundle_value]['properties'][$field_name];
     $description = isset($descriptions[$field['type']]) ? $descriptions[$field['type']] : $descriptions['default'];
     $description .= !function_exists('_parser_attach_field_' . $field['type']) ? ' <span style="color:red;">Тип поля не поддерживается, это значит что код должен вернуть структуру поля. Например: <code>return array(0 => array(\'value\' => $doc->find(\'#some-id\')->text()));</code></span>' : '';
@@ -262,7 +273,7 @@ function parser_job_form($form, &$form_state, $job) {
     
     $form['fields_wrapper']['fields_code'][$fieldset_name] = array(
       '#type' => 'fieldset',
-      '#title' => $instance['label'] . ' (' . $field_name . ')',
+      '#title' => $field_instance['label'] . ' (' . $field_name . ')',
       '#description' => $property_info['description'],
       '#collapsible' => TRUE,
       '#collapsed' => TRUE,
@@ -278,7 +289,7 @@ function parser_job_form($form, &$form_state, $job) {
       '#required' => $property_info['required'],
     ) + $check_button;
 
-    if (!empty($instance['settings']['text_processing'])) {
+    if (!empty($field_instance['settings']['text_processing'])) {
       $form['fields_wrapper']['fields_code'][$fieldset_name][$field_name . '_format'] = array(
         '#type' => 'select',
         '#title' => 'Формат текста',

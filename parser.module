@@ -737,9 +737,12 @@ function parser_result_page($job) {
   
   $rows = array();
   foreach ($result as $row) {
+    $entity = current(entity_load($job->entity_type, array($row->entity_id)));
+    $uri = entity_uri($job->entity_type, $entity);
+    
     $rows[] = array(
       l($row->url, $row->url),
-      $row->{$label_key},
+      l($row->{$label_key}, $uri['path'], $uri['options']),
       $row->page_key,
     );
   }

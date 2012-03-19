@@ -476,6 +476,7 @@ function parser_job_form_submit(&$form, &$form_state) {
 function parser_parse($job, &$context) {
   if (empty($context['sandbox'])) {
     $context['sandbox']['progress'] = 0;
+    $context['sandbox']['entity_ids'] = array();
     $context['sandbox']['created_entities'] = 0;
     $context['results']['jid'] = $job->jid;
     $context['results']['time_start'] = time();
@@ -486,7 +487,6 @@ function parser_parse($job, &$context) {
     $context['results']['pages_from_cache'] = 0;
     $context['results']['downloaded_files'] = 0;
     $context['results']['files_from_cache'] = 0;
-    $context['results']['entity_ids'] = array();
   }
   
   $url = _parser_url_get_not_parsed();
@@ -538,7 +538,7 @@ function parser_parse($job, &$context) {
       }
     }
   }
-  if ($allowed_parse && $entity_id && in_array($entity_id, $context['results']['entity_ids'])) {
+  if ($allowed_parse && $entity_id && in_array($entity_id, $context['sandbox']['entity_ids'])) {
     $allowed_parse = FALSE;
   }
   if ($allowed_parse && $job->no_update && $entity_id) {

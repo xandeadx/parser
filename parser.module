@@ -77,7 +77,7 @@ function parser_job_form($form, &$form_state, $job) {
   $check_button = array('#field_prefix' => '<input type="button" value="проверить" class="form-submit check-button" />');
   $fields_code = isset($job->fields_code) ? $job->fields_code : array();
   $entity_types = entity_get_info();
-  $fields = field_info_fields();
+  $fields = field_info_fields(); dsm($fields);
   $formats = filter_formats();
   
   $entity_type_options = array();
@@ -100,7 +100,9 @@ function parser_job_form($form, &$form_state, $job) {
     $bundle_value = $form_state['values']['bundle'];
   }
   
-  $bundle_key = $entity_types[$entity_type_value]['entity keys']['bundle'];
+  $entity_keys = $entity_types[$entity_type_value]['entity keys'];
+  $bundle_key = $entity_keys['bundle'];
+  $label_key = isset($entity_keys['label']) ? $entity_keys['label'] : '';
   
   $entity_properties = entity_get_property_info($entity_type_value);
   if ($entity_type_value == 'taxonomy_term') {
@@ -109,6 +111,7 @@ function parser_job_form($form, &$form_state, $job) {
   if (isset($entity_properties['properties'][$bundle_key])) {
     unset($entity_properties['properties'][$bundle_key]);
   }
+  dsm($entity_properties);
   
   $fields_instances = field_info_instances($entity_type_value, $bundle_value);
   
@@ -227,6 +230,8 @@ function parser_job_form($form, &$form_state, $job) {
     '#tree' => TRUE,
   );
   
+  $weight = 1;
+  
   // Properties
   foreach ($entity_properties['properties'] as $property_name => $property_info) {
     if (!empty($property_info['computed']) || !empty($property_info['field'])) {
@@ -239,6 +244,7 @@ function parser_job_form($form, &$form_state, $job) {
       '#description' => isset($property_info['description']) ? $property_info['description'] : '',
       '#collapsible' => TRUE,
       '#collapsed' => TRUE,
+      '#weight' => !empty($property_info['required']) ? $weight++ : 100,
     );
     
     $form['fields_wrapper']['fields_code'][$property_name . '_fieldset'][$property_name] = array(
@@ -263,7 +269,7 @@ function parser_job_form($form, &$form_state, $job) {
     'node_reference'          => 'PHP код, который должен вернуть либо nid материала, либо его заголовок (не рекомендуется). Чтобы получить nid материала по идентификатору страницы, воспользуйтесь функцией parser_get_entity_id_by_page_key($page_key)',
   );
   
-  foreach ($fields as $field_name => $field) { 
+  foreach ($fields as $field_name => $field) {  dsm($field_name);
     if (!isset($field['bundles'][$entity_type_value]) || !in_array($bundle_value, $field['bundles'][$entity_type_value])) {
       continue;
     }
@@ -280,6 +286,7 @@ function parser_job_form($form, &$form_state, $job) {
       '#description' => $property_info['description'],
       '#collapsible' => TRUE,
       '#collapsed' => TRUE,
+      '#weight' => $weight++,
     );
   
     $form['fields_wrapper']['fields_code'][$fieldset_name][$field_name] = array(

@@ -123,6 +123,7 @@ function parser_job_form($form, &$form_state, $job) {
     '#description' => 'Будет отображаться в списке с заданиями. Пример заполнения: <code>Парсинг проектов на drupal.org</code>',
     '#required' => TRUE,
     '#default_value' => isset($job->title) ? $job->title : '',
+    '#maxlength' => 255,
   );
   
   $form['start_url'] = array(
@@ -131,6 +132,7 @@ function parser_job_form($form, &$form_state, $job) {
     '#description' => 'Адрес, с которого парсер начнёт работу. Пример заполнения: <code>http://drupal.org/project/modules</code>',
     '#required' => TRUE,
     '#default_value' => isset($job->start_url) ? $job->start_url : '',
+    '#maxlength' => 255,
   );
   
   $form['test_url'] = array(
@@ -139,6 +141,7 @@ function parser_job_form($form, &$form_state, $job) {
     '#description' => 'Адрес любой страницы, попадающей под условие парсинга, которая будет использоваться для проверки работоспособности кода.',
     '#required' => TRUE,
     '#default_value' => isset($job->test_url) ? $job->test_url : '',
+    '#maxlength' => 255,
   );
   
   $form['depth'] = array(
@@ -146,7 +149,7 @@ function parser_job_form($form, &$form_state, $job) {
     '#title' => 'Глубина',
     '#description' => 'Глубина, на которую парсер будет ходить по ссылкам. Например 1 означает, что будет распарсен стартовый адрес и страницы на которые он ссылается, т.е. парсер пройдёт вглубь на 1 уровень относительно стартовой страницы.',
     '#required' => TRUE,
-    '#default_value' => isset($job->depth) ? $job->depth : 1,
+    '#default_value' => isset($job->depth) ? $job->depth : '',
     '#size' => 5,
   );
   
@@ -232,7 +235,7 @@ function parser_job_form($form, &$form_state, $job) {
     
     $form['fields_wrapper']['fields_code'][$property_name . '_fieldset'] = array(
       '#type' => 'fieldset',
-      '#title' => $property_info['label'] . ' (' . $property_name . ')',
+      '#title' => $property_info['label'] . ' (' . $property_name . ')' . (!empty($property_info['required']) ? ' *' : ''),
       '#description' => isset($property_info['description']) ? $property_info['description'] : '',
       '#collapsible' => TRUE,
       '#collapsed' => TRUE,

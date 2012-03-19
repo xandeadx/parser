@@ -417,18 +417,6 @@ function parser_job_form_submit(&$form, &$form_state) {
     $form_state['redirect'] = 'admin/structure/parser_jobs/manage/' . $job->jid;
   }
   else {
-    // Clear vocabularies
-    foreach ($fields as $field_name => $field) {
-      if (
-        isset($field['bundles'][$job->entity_type]) &&
-        in_array($job->bundle, $field['bundles'][$job->entity_type]) &&
-        $field['type'] == 'taxonomy_term_reference' &&
-        $fields_code[$field_name . '_clear_voc']
-      ) {
-        _parser_clear_vocabulary($field['settings']['allowed_values'][0]['vocabulary']);
-      }
-    }
-    
     _parser_url_delete_all();
     _parser_url_add($job->start_url);
   
@@ -552,29 +540,11 @@ function parser_parse($job, &$context) {
         continue;
       }
       
-      $result = eval($php_code);
+      if (!($result = eval($php_code))) {
+        continue;
+      }
       
-      // Is field
-      if (isset($instances[$field_name])) {
-        $function = '_parser_attach_field_' . $fields[$field_name]['type'];
-        if (!function_exists($function)) {
-          $function = '_parser_attach_field';
-        }
-        $function(
-          $entity,
-          $field_name,
-          $result,
-          $job,
-          $fields[$field_name],
-          $instances[$field_name],
-          $page_url,
-          $context['results']
-        );
-      }
-      // Is property
-      else {
-        $entity_wrapper->{$field_name} = $result;
-      }
+      $entity_wrapper->{$field_name} = $result;
     }
     
     if ($entity) {

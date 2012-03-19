@@ -77,8 +77,9 @@ function parser_job_form($form, &$form_state, $job) {
   $check_button = array('#field_prefix' => '<input type="button" value="проверить" class="form-submit check-button" />');
   $fields_code = isset($job->fields_code) ? $job->fields_code : array();
   $entity_types = entity_get_info();
-  $fields = field_info_fields(); dsm($fields);
+  $fields_info = field_info_fields(); dsm($fields_info);
   $formats = filter_formats();
+  $weight = 0;
   
   $entity_type_options = array();
   foreach ($entity_types as $entity_type => $entity_info) {
@@ -230,91 +231,34 @@ function parser_job_form($form, &$form_state, $job) {
     '#tree' => TRUE,
   );
   
-  $weight = 1;
-  
-  // Properties
-  foreach ($entity_properties['properties'] as $property_name => $property_info) {
-    if (!empty($property_info['computed']) || !empty($property_info['field'])) {
-      continue;
-    }
-    
-    $form['fields_wrapper']['fields_code'][$property_name . '_fieldset'] = array(
-      '#type' => 'fieldset',
-      '#title' => $property_info['label'] . ' (' . $property_name . ')' . (!empty($property_info['required']) ? ' *' : ''),
-      '#description' => isset($property_info['description']) ? $property_info['description'] : '',
-      '#collapsible' => TRUE,
-      '#collapsed' => TRUE,
-      '#weight' => !empty($property_info['required']) ? $weight++ : 100,
-    );
-    
-    $form['fields_wrapper']['fields_code'][$property_name . '_fieldset'][$property_name] = array(
-      '#type' => 'textarea',
-      '#title' => 'PHP код',
-      '#description' => 'PHP код, который должен вернуть значение поля' . (isset($property_info['type']) ? ' (тип: ' . $property_info['type'] . ')' : ''),
-      '#default_value' => isset($fields_code[$property_name]) ? $fields_code[$property_name] : '',
-      '#rows' => 3,
-      '#resizable' => FALSE,
-      '#required' => !empty($property_info['required']),
-    ) + $check_button;
-  }
-  
   // Fields
-  $descriptions = array(
-    'default'                 => 'PHP код, который должен вернуть значение поля.',
-    'file'                    => 'PHP код, который должен вернуть URL файла. Адрес может быть как абсолютный, так и относительный. Все файлы будут закачаны в директорию, указанную в настройках поля. Пример заполнения: <code>return $doc->find(\'a.download-link\')->attr(\'href\');</code>',
-    'image'                   => 'PHP код, который должен вернуть URL картинки. Адрес может быть как абсолютный, так и относительный. Все картинки будут закачаны в директорию, указанную в настройках поля. Пример заполнения: <code>return $doc->find(\'img.cover\')->attr(\'src\');</code>',
-    'taxonomy_term_reference' => 'PHP код, который должен вернуть название термина, либо массив названий. Отсутствующие термины будут созданы автоматически. Пример заполнения:<br /><code>$terms = array();<br />foreach ($doc->find(\'.tags li\') as $li) $terms[] = pq($li)->text();<br />return $terms;</code>',
-    'text_with_summary'       => 'PHP код, который должен вернуть значение поля. Пример заполнения: <code>return $doc->find(\'article .content\')->html();</code>',
-    'list_text'               => 'PHP код, который должен вернуть либо ключ из списка допустимых значений, либо подпись. Если значения нет в списке допустимых, то оно будет проигнорированно. Пример заполнения: <code>return $doc->find(\'selector\')->text();</code>',
-    'node_reference'          => 'PHP код, который должен вернуть либо nid материала, либо его заголовок (не рекомендуется). Чтобы получить nid материала по идентификатору страницы, воспользуйтесь функцией parser_get_entity_id_by_page_key($page_key)',
-  );
-  
-  foreach ($fields as $field_name => $field) {  dsm($field_name);
-    if (!isset($field['bundles'][$entity_type_value]) || !in_array($bundle_value, $field['bundles'][$entity_type_value])) {
+  foreach (($entity_properties['properties'] + $entity_properties['bundles'][$bundle_value]['properties']) as $field_name => $field_info) {
+    if (!empty($field_info['computed'])) {
       continue;
     }
-      
-    $field_instance = $fields_instances[$field_name];
-    $property_info = $entity_properties['bundles'][$bundle_value]['properties'][$field_name];
-    $description = isset($descriptions[$field['type']]) ? $descriptions[$field['type']] : $descriptions['default'];
-    $description .= !function_exists('_parser_attach_field_' . $field['type']) ? ' <span style="color:red;">Тип поля не поддерживается, это значит что код должен вернуть структуру поля. Например: <code>return array(0 => array(\'value\' => $doc->find(\'#some-id\')->text()));</code></span>' : '';
-    $fieldset_name = $field_name . '_fieldset';
     
-    $form['fields_wrapper']['fields_code'][$fieldset_name] = array(
+    $field_type = isset($field_info['type']) ? $field_info['type'] : '';
+    
+    $form['fields_wrapper']['fields_code'][$field_name . '_fieldset'] = array(
       '#type' => 'fieldset',
-      '#title' => $field_instance['label'] . ' (' . $field_name . ')',
-      '#description' => $property_info['description'],
+      '#title' => $field_info['label'] . ' (' . $field_name . ')' . (!empty($field_info['required']) ? ' *' : ''),
+      '#description' => isset($field_info['description']) ? $field_info['description'] : '',
       '#collapsible' => TRUE,
       '#collapsed' => TRUE,
-      '#weight' => $weight++,
+      '#weight' => (!empty($field_info['required']) || !empty($field_info['field'])) ? $weight : $weight + 100,
     );
-  
-    $form['fields_wrapper']['fields_code'][$fieldset_name][$field_name] = array(
+    
+    $form['fields_wrapper']['fields_code'][$field_name . '_fieldset'][$field_name] = array(
       '#type' => 'textarea',
       '#title' => 'PHP код',
-      '#description' => $description,
+      '#description' => 'PHP код, который должен вернуть значение поля' . ($field_type ? ' (тип значения: ' . $field_type . ')' : ''),
       '#default_value' => isset($fields_code[$field_name]) ? $fields_code[$field_name] : '',
       '#rows' => 3,
       '#resizable' => FALSE,
-      '#required' => $property_info['required'],
+      '#required' => !empty($field_info['required']),
     ) + $check_button;
-
-    if (!empty($field_instance['settings']['text_processing'])) {
-      $form['fields_wrapper']['fields_code'][$fieldset_name][$field_name . '_format'] = array(
-        '#type' => 'select',
-        '#title' => 'Формат текста',
-        '#description' => 'Формат текста, который будет установлен для поля.',
-        '#options' => $format_options,
-        '#default_value' => isset($fields_code[$field_name . '_format']) ? $fields_code[$field_name . '_format'] : '',
-      );
-    }
     
-    if ($field['type'] == 'taxonomy_term_reference') {
-      $form['fields_wrapper']['fields_code'][$fieldset_name][$field_name . '_clear_voc'] = array(
-        '#type' => 'checkbox',
-        '#title' => 'Очистить словарь перед парсингом.',
-      );
-    }
+    $weight++;
   }
   
   $form['advanced_settings'] = array(

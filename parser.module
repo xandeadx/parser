@@ -232,7 +232,7 @@ function parser_job_form($form, &$form_state, $job) {
     '#tree' => TRUE,
   );
   
-  // Fields
+  // Properties & Fields
   foreach (($entity_properties + $bundle_properties) as $field_name => $field_info) {
     if (!empty($field_info['computed'])) {
       continue;
@@ -240,6 +240,8 @@ function parser_job_form($form, &$form_state, $job) {
     
     $fieldset_name = $field_name . '_fieldset';
     $field_type = isset($field_info['type']) ? $field_info['type'] : '';
+    $is_field = isset($field_info['field']);
+    $cardinality = $is_field ? $fields_info[$field_name]['cardinality'] : 1;
     
     $form['fields_wrapper']['fields_code'][$fieldset_name] = array(
       '#type' => 'fieldset',
@@ -250,12 +252,14 @@ function parser_job_form($form, &$form_state, $job) {
       '#weight' => (!empty($field_info['required']) || !empty($field_info['field'])) ? $weight : $weight + 100,
     );
     
-    $description = 'PHP код, который должен вернуть ';
-    if (isset($field_info['property info'])) {
-      $description .= 'массив в формате:<br /><br /><code>' . _parser_get_field_structure($field_info) . '</code>';
+    $description = 'PHP код, который должен вернуть ' . ($cardinality == 1 ? 'значение' : 'массив значений') . ' поля';
+    // Simle field or property
+    if (!isset($field_info['property info'])) {
+      $description .=  ($field_type ? ' (тип значения: ' . $field_type . ').' : '.');
     }
+    // Compound field or property
     else {
-      $description .= 'значение поля' . ($field_type ? ' (тип значения: ' . $field_type . ')' : '') . '.';
+      $description .= '. Каждое значение должно быть в формате:<br /><br /><code>array(<br />' . _parser_get_field_structure($field_info) . ')</code>';
     }
     
     $form['fields_wrapper']['fields_code'][$fieldset_name][$field_name] = array(
@@ -858,21 +862,19 @@ function _parser_get_page_by_url($url, $charset = 'auto', $skip_cache = FALSE, &
       $result = drupal_http_request($result->headers['location'], $options);
     }
     
-    if (strpos($result['headers']['content-type'], 'text/html')) {
-      if (!empty($result->data)) {
-        $page = $result->data;
-        file_unmanaged_save_data($page, $cache_uri);
-        
-        if ($results) {
-          $results['pages_from_http']++;
-        }
+    if (!empty($result->data)) {
+      $page = $result->data;
+      file_unmanaged_save_data($page, $cache_uri);
+      
+      if ($results) {
+        $results['pages_from_http']++;
       }
-      else {
-        watchdog('parser', 'Не удалось скачать страницу ' . $url . (isset($result->error) ? '. Ошибка: ' . $result->error : ''), array(), WATCHDOG_ALERT);
-        
-        if ($results) {
-          $results['error_pages_from_http']++;
-        }
+    }
+    else {
+      watchdog('parser', 'Не удалось скачать страницу ' . $url . (isset($result->error) ? '. Ошибка: ' . $result->error : ''), array(), WATCHDOG_ALERT);
+      
+      if ($results) {
+        $results['error_pages_from_http']++;
       }
     }
   }
@@ -1019,26 +1021,16 @@ function _parser_attach_field_image(&$entity, $field_name, $field_values, $job, 
 /**
  * Attach field type "taxonomy_term_reference" to entity object
  */
-function _parser_attach_field_taxonomy_term_reference(&$entity, $field_name, $field_values, $job, $field_info, $field_instance, $page_url) {
-  if (!is_array($field_values)) {
-    $field_values = array($field_values);
-  }
-  if (isset($entity->{$field_name})) {
-    unset($entity->{$field_name});
-  }
-  
-  $voc_machine_name = $field_info['settings']['allowed_values'][0]['vocabulary'];
+function _parser_preprocess_field_taxonomy_term_reference(&$result, $field_info) {
+  /*$voc_machine_name = $field_info['settings']['allowed_values'][0]['vocabulary'];
   $voc = taxonomy_vocabulary_machine_name_load($voc_machine_name);
 
-  foreach ($field_values as $term_name) {
-    $term_name = trim($term_name);
-    $term = current(taxonomy_term_load_multiple(array(), array('name' => $term_name, 'vid' => $voc->vid)));
-    if (!$term) {
-      $term = (object)array('vid' => $voc->vid, 'name' => $term_name);
-      taxonomy_term_save($term);
-    }
-    $entity->{$field_name}[LANGUAGE_NONE][]['tid'] = $term->tid;
-  }
+  $term_name = trim($term_name);
+  $term = current(taxonomy_term_load_multiple(array(), array('name' => $term_name, 'vid' => $voc->vid)));
+  if (!$term) {
+    $term = (object)array('vid' => $voc->vid, 'name' => $term_name);
+    taxonomy_term_save($term);
+  }*/
 }
 
 /**
@@ -1214,11 +1206,18 @@ function _parser_create_phpquery($html, $charset_fix = FALSE) {
 /**
  * Return example field structure
  */
-function _parser_get_field_structure($field_info) {
+function _parser_get_field_structure($field_info, $spaces = 2) {
   $strucure = '';
   foreach ($field_info['property info'] as $property_name => $property_info) {
-    $strucure .= "&nbsp;&nbsp;'$property_name' => \${$property_name}, // " . $property_info['label'] . ' (' . $property_info['type'] . ', ' . (isset($property_info['required']) ? 'required' : 'optional') . ')<br />';
+    $strucure .= _parcer_spaces($spaces) . "'$property_name' => \${$property_name}, // " . $property_info['label'] . ' (' . $property_info['type'] . ', ' . (isset($property_info['required']) ? 'required' : 'optional') . ')<br />';
   }
-  return 'array(<br />' . $strucure . ')';
+  return $strucure;
+}
+
+/**
+ * Return spaces
+ */
+function _parcer_spaces($count) {
+  return str_repeat('&nbsp;', $count);
 }
 

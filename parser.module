@@ -77,7 +77,7 @@ function parser_job_form($form, &$form_state, $job) {
   $check_button = array('#field_prefix' => '<input type="button" value="проверить" class="form-submit check-button" />');
   $fields_code = isset($job->fields_code) ? $job->fields_code : array();
   $entity_types = entity_get_info();
-  $fields_info = field_info_fields(); dsm($fields_info);
+  $fields_info = field_info_fields();
   $formats = filter_formats();
   $weight = 0;
   
@@ -114,7 +114,6 @@ function parser_job_form($form, &$form_state, $job) {
   if (isset($entity_properties[$bundle_key])) {
     unset($entity_properties[$bundle_key]);
   }
-  dsm($all_properties);
   
   $fields_instances = field_info_instances($entity_type_value, $bundle_value);
   
@@ -858,20 +857,22 @@ function _parser_get_page_by_url($url, $charset = 'auto', $skip_cache = FALSE, &
     if ($result->code == 303 && !empty($result->headers['location'])) {
       $result = drupal_http_request($result->headers['location'], $options);
     }
-  
-    if (!empty($result->data)) {
-      $page = $result->data;
-      file_unmanaged_save_data($page, $cache_uri);
-      
-      if ($results) {
-        $results['pages_from_http']++;
+    
+    if (strpos($result['headers']['content-type'], 'text/html')) {
+      if (!empty($result->data)) {
+        $page = $result->data;
+        file_unmanaged_save_data($page, $cache_uri);
+        
+        if ($results) {
+          $results['pages_from_http']++;
+        }
       }
-    }
-    else {
-      watchdog('parser', 'Не удалось скачать страницу ' . $url . (isset($result->error) ? '. Ошибка: ' . $result->error : ''), array(), WATCHDOG_ALERT);
-      
-      if ($results) {
-        $results['error_pages_from_http']++;
+      else {
+        watchdog('parser', 'Не удалось скачать страницу ' . $url . (isset($result->error) ? '. Ошибка: ' . $result->error : ''), array(), WATCHDOG_ALERT);
+        
+        if ($results) {
+          $results['error_pages_from_http']++;
+        }
       }
     }
   }

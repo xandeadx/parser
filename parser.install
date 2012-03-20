@@ -195,7 +195,7 @@ function parser_install() {
     'parse_limit' => 5,
     'white_list' => 'http://drupal.org/project/*',
     'black_list' => '' . 
-      'http://drupal.org/project/issues/*' . "\n" .
+      'http://drupal.org/project/issues*' . "\n" .
       'http://drupal.org/project/themes?solrsort*' . "\n" .
       'http://drupal.org/project/themes?filters*' . "\n" .
       'http://drupal.org/project/modules*',
@@ -214,8 +214,10 @@ function parser_install() {
       'body' => '' .
         '$content = $doc->find(\'.node-content\')->clone();' . "\n" .
         '$content->find(\'.all-attached-images\')->remove();' . "\n" .
-        'return $content->html();',
-      'body_format' => 'full_html',
+        'return array(' . "\n" .
+        '  \'value\' => $content->html(),' . "\n" .
+        '  \'format\' => \'full_html\',' . "\n" .
+        ');' . "\n",
       'field_tags' => '' .
         '$terms = array();' . "\n" .
         'foreach ($doc->find(\'.project-info a[href^="/taxonomy/term/"]\') as $a) {' . "\n" .
@@ -229,7 +231,8 @@ function parser_install() {
   );
   entity_save('parser_job', $job);
   
-  foreach (array('public://parser_cache/html', 'public://parser_cache/files') as $directory) {
+  foreach (array('html', 'files') as $directory) {
+    $directory = 'public://parser_cache/' . $directory;
     file_prepare_directory($directory, FILE_CREATE_DIRECTORY);
   }
 }

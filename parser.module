@@ -1068,21 +1068,6 @@ function _parser_attach_field_image(&$entity, $field_name, $field_values, $job, 
 }
 
 /**
- * Preprocess field type "number_integer"
- */
-function _parser_attach_field_number_integer(&$entity, $field_name, $field_values, $job, $field_info, $field_instance, $page_url) {
-  if (!is_array($field_values)) {
-    $field_values = array($field_values);
-  }
-  if (isset($entity->{$field_name})) {
-    unset($entity->{$field_name});
-  }
-  foreach ($field_values as $field_value) {
-    $entity->{$field_name}[LANGUAGE_NONE][]['value'] = (int)$field_value;
-  }
-}
-
-/**
  * Preprocess field type "list_text"
  */
 function _parser_attach_field_list_text(&$entity, $field_name, $field_values, $job, $field_info, $field_instance, $page_url) {
@@ -1108,22 +1093,6 @@ function _parser_attach_field_list_text(&$entity, $field_name, $field_values, $j
     }
   
     $entity->{$field_name}[LANGUAGE_NONE][]['value'] = $field_value;
-  }
-}
-
-/**
- * Attach field type "node_reference" to entity object
- */
-function _parser_attach_field_node_reference(&$entity, $field_name, $field_values, $job, $field_info, $field_instance, $page_url) {
-  if (!is_array($field_values)) {
-    $field_values = array($field_values);
-  }
-  if (isset($entity->{$field_name})) {
-    unset($entity->{$field_name});
-  }
-
-  foreach ($field_values as $field_value) {
-    $entity->{$field_name}[LANGUAGE_NONE][]['nid'] = (int)$field_value;
   }
 }
 

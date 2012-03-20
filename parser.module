@@ -919,7 +919,7 @@ function _parser_preprocess_field_text(&$result, $field_info) {
     }
   }
   
-  $result = ($field_info['cardinality'] == 1) ? array_shift($result_array) : $result_array;
+  $result = ($field_info['cardinality'] == 1) ? reset($result_array) : $result_array;
 }
 
 /**
@@ -940,7 +940,7 @@ function _parser_preprocess_field_text_with_summary(&$result, $field_info) {
     }
   }
 
-  $result = ($field_info['cardinality'] == 1) ? array_shift($result_array) : $result_array;
+  $result = ($field_info['cardinality'] == 1) ? reset($result_array) : $result_array;
 }
 
 /**
@@ -961,7 +961,7 @@ function _parser_preprocess_field_taxonomy_term_reference(&$result, $field_info)
     $value = $term->tid;
   }
   
-  $result = ($field_info['cardinality'] == 1) ? array_shift($result_array) : $result_array;
+  $result = ($field_info['cardinality'] == 1) ? reset($result_array) : $result_array;
 }
 
 /**

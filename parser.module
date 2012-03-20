@@ -910,15 +910,37 @@ function _parser_get_page_by_url($url, $charset = 'auto', $skip_cache = FALSE, &
 function _parser_preprocess_field_text(&$result, $field_info) {
   $result_array = ($field_info['cardinality'] == 1) ? array($result) : $result;
   
-  foreach ($result_array as $key => &$value) {
+  foreach ($result_array as &$value) {
     $value = trim($value);
     if (!empty($field_info['settings']['max_length']) && drupal_strlen($value) > $field_info['settings']['max_length']) {
-      watchdog('parser', 'Обрезан текст в поле "' . $field_info['field_name'] . '": "<i>' . check_plain($value) . '</i>".');
+      $original_value = $value;
       $value = drupal_substr($value, 0, $field_info['settings']['max_length']);
+      watchdog('parser', 'Обрезан текст в поле "' . $field_info['field_name'] . '": "<i>' . check_plain($original_value) . '</i>" => "<i>' . check_plain($value) . '</i>".');
     }
   }
   
-  $result = ($field_info['cardinality'] == 1) ? current($result_array) : $result_array;
+  $result = ($field_info['cardinality'] == 1) ? array_shift($result_array) : $result_array;
+}
+
+/**
+ * Preprocess field type "text_with_summary"
+ */
+function _parser_preprocess_field_text_with_summary(&$result, $field_info) {
+  $result_array = ($field_info['cardinality'] == 1) ? array($result) : $result;
+  
+  foreach ($result_array as &$value) {
+    if (!empty($value['value'])) {
+      $value['value'] = trim($value['value']);
+    }
+    if (!empty($value['summary'])) {
+      $value['summary'] = trim($value['summary']);
+    }
+    if (empty($value['format'])) {
+      $value['format'] = 'filtered_html';
+    }
+  }
+
+  $result = ($field_info['cardinality'] == 1) ? array_shift($result_array) : $result_array;
 }
 
 /**
@@ -927,7 +949,7 @@ function _parser_preprocess_field_text(&$result, $field_info) {
 function _parser_preprocess_field_taxonomy_term_reference(&$result, $field_info) {
   $result_array = ($field_info['cardinality'] == 1) ? array($result) : $result;
   
-  foreach ($result_array as $key => &$value) {
+  foreach ($result_array as &$value) {
     $voc_machine_name = $field_info['settings']['allowed_values'][0]['vocabulary'];
     $vid = taxonomy_vocabulary_machine_name_load($voc_machine_name)->vid;
     $term_name = trim($value);
@@ -939,7 +961,7 @@ function _parser_preprocess_field_taxonomy_term_reference(&$result, $field_info)
     $value = $term->tid;
   }
   
-  $result = ($field_info['cardinality'] == 1) ? current($result_array) : $result_array;
+  $result = ($field_info['cardinality'] == 1) ? array_shift($result_array) : $result_array;
 }
 
 /**

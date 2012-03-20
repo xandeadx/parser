@@ -905,18 +905,45 @@ function _parser_get_page_by_url($url, $charset = 'auto', $skip_cache = FALSE, &
 }
 
 /**
- * Attach field type "text" to entity object
+ * Preprocess field type "text"
  */
 function _parser_preprocess_field_text(&$result, $field_info) {
-  $result = trim($result);
-  if (!empty($field_info['settings']['max_length']) && drupal_strlen($result) > $field_info['settings']['max_length']) {
-    watchdog('parser', 'Обрезан текст в поле "' . $field_info['field_name'] . '". Оригинальный текст: "<i>' . check_plain($result) . '</i>".');
-    $result = drupal_substr($result, 0, $field_info['settings']['max_length']);
+  $result_array = ($field_info['cardinality'] == 1) ? array($result) : $result;
+  
+  foreach ($result_array as $key => &$value) {
+    $value = trim($value);
+    if (!empty($field_info['settings']['max_length']) && drupal_strlen($value) > $field_info['settings']['max_length']) {
+      watchdog('parser', 'Обрезан текст в поле "' . $field_info['field_name'] . '": "<i>' . check_plain($value) . '</i>".');
+      $value = drupal_substr($value, 0, $field_info['settings']['max_length']);
+    }
   }
+  
+  $result = ($field_info['cardinality'] == 1) ? current($result_array) : $result_array;
 }
 
 /**
- * Attach field type "file" to entity object
+ * Preprocess field type "taxonomy_term_reference"
+ */
+function _parser_preprocess_field_taxonomy_term_reference(&$result, $field_info) {
+  $result_array = ($field_info['cardinality'] == 1) ? array($result) : $result;
+  
+  foreach ($result_array as $key => &$value) {
+    $voc_machine_name = $field_info['settings']['allowed_values'][0]['vocabulary'];
+    $vid = taxonomy_vocabulary_machine_name_load($voc_machine_name)->vid;
+    $term_name = trim($value);
+    $term = current(taxonomy_term_load_multiple(array(), array('name' => $term_name, 'vid' => $vid)));
+    if (!$term) {
+      $term = (object)array('vid' => $vid, 'name' => $term_name);
+      taxonomy_term_save($term);
+    }
+    $value = $term->tid;
+  }
+  
+  $result = ($field_info['cardinality'] == 1) ? current($result_array) : $result_array;
+}
+
+/**
+ * Preprocess field type "file"
  */
 function _parser_attach_field_file(&$entity, $field_name, $field_values, $job, $field_info, $field_instance, $page_url, &$results) {
   if (!$field_values) {
@@ -1012,29 +1039,14 @@ function _parser_attach_field_file(&$entity, $field_name, $field_values, $job, $
 }
 
 /**
- * Attach field type "image" to entity object
+ * Preprocess field type "image"
  */
 function _parser_attach_field_image(&$entity, $field_name, $field_values, $job, $field_info, $field_instance, $page_url, &$results) {
   _parser_attach_field_file($entity, $field_name, $field_values, $job, $field_info, $field_instance, $page_url, $results);
 }
 
 /**
- * Attach field type "taxonomy_term_reference" to entity object
- */
-function _parser_preprocess_field_taxonomy_term_reference(&$result, $field_info) {
-  /*$voc_machine_name = $field_info['settings']['allowed_values'][0]['vocabulary'];
-  $voc = taxonomy_vocabulary_machine_name_load($voc_machine_name);
-
-  $term_name = trim($term_name);
-  $term = current(taxonomy_term_load_multiple(array(), array('name' => $term_name, 'vid' => $voc->vid)));
-  if (!$term) {
-    $term = (object)array('vid' => $voc->vid, 'name' => $term_name);
-    taxonomy_term_save($term);
-  }*/
-}
-
-/**
- * Attach field type "number_integer" to entity object
+ * Preprocess field type "number_integer"
  */
 function _parser_attach_field_number_integer(&$entity, $field_name, $field_values, $job, $field_info, $field_instance, $page_url) {
   if (!is_array($field_values)) {
@@ -1049,7 +1061,7 @@ function _parser_attach_field_number_integer(&$entity, $field_name, $field_value
 }
 
 /**
- * Attach field type "list_text" to entity object
+ * Preprocess field type "list_text"
  */
 function _parser_attach_field_list_text(&$entity, $field_name, $field_values, $job, $field_info, $field_instance, $page_url) {
   if (!is_array($field_values)) {

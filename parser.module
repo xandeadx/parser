@@ -278,7 +278,7 @@ function parser_job_form($form, &$form_state, $job) {
       );
       
       $form['fields_wrapper']['fields_code'][$fieldset_name]['techical_info_fieldset']['techical_info'] = array(
-        '#markup' => kprint_r($field_info, TRUE),
+        '#markup' => kprint_r($field_info, TRUE, 'entity_get_property_info()') . (isset($field_info['field']) ? kprint_r($fields_info[$field_name], TRUE, 'field_info_fields()') : ''),
       );
     }
     
@@ -540,8 +540,17 @@ function parser_parse($job, &$context) {
         continue;
       }
       
-      if (!($result = eval($php_code))) {
+      $result = eval($php_code);
+      if ($result === NULL) {
         continue;
+      }
+      
+      // Is field
+      if (isset($fields[$field_name])) {
+        $function = '_parser_preprocess_field_' . $fields[$field_name]['type'];
+        if (function_exists($function)) {
+          $function($result, $fields[$field_name]);
+        }
       }
       
       $entity_wrapper->{$field_name} = $result;
@@ -893,45 +902,14 @@ function _parser_get_page_by_url($url, $charset = 'auto', $skip_cache = FALSE, &
 }
 
 /**
- * Attach field to entity object
- */
-function _parser_attach_field(&$entity, $field_name, $field_value, $job, $field_info, $field_instance, $page_url) {
-  $entity->{$field_name}[LANGUAGE_NONE] = $field_value;
-}
-
-/**
  * Attach field type "text" to entity object
  */
-function _parser_attach_field_text(&$entity, $field_name, $field_values, $job, $field_info, $field_instance, $page_url) {
-  if (!is_array($field_values)) {
-    $field_values = array($field_values);
+function _parser_preprocess_field_text(&$result, $field_info) {
+  $result = trim($result);
+  if (!empty($field_info['settings']['max_length']) && drupal_strlen($result) > $field_info['settings']['max_length']) {
+    watchdog('parser', 'Обрезан текст в поле "' . $field_info['field_name'] . '". Оригинальный текст: "<i>' . check_plain($result) . '</i>".');
+    $result = drupal_substr($result, 0, $field_info['settings']['max_length']);
   }
-  if (isset($entity->{$field_name})) {
-    unset($entity->{$field_name});
-  }
-  
-  $i = 0;
-  foreach ($field_values as $field_value) {
-    $field_value = trim($field_value);
-    if (!empty($field_info['settings']['max_length'])) {
-      $field_value = drupal_substr($field_value, 0, $field_info['settings']['max_length']);
-    }
-    
-    $entity->{$field_name}[LANGUAGE_NONE][$i]['value'] = $field_value;
-  
-    if ($field_instance['settings']['text_processing']) {
-      $entity->{$field_name}[LANGUAGE_NONE][$i]['format'] = $job->fields_code[$field_name . '_format'];
-    }
-    
-    $i++;
-  }
-}
-
-/**
- * Attach field type "text_with_summary" to entity object
- */
-function _parser_attach_field_text_with_summary(&$entity, $field_name, $field_values, $job, $field_info, $field_instance, $page_url) {
-  _parser_attach_field_text($entity, $field_name, $field_values, $job, $field_info, $field_instance, $page_url);
 }
 
 /**
@@ -1230,15 +1208,6 @@ function _parser_clear_vocabulary($vocabulary_name) {
 function _parser_create_phpquery($html, $charset_fix = FALSE) {
   require_once('phpQuery/phpQuery/phpQuery.php');
   return phpQuery::newDocumentHTML($html, $charset_fix ? 'utf8' : NULL);
-}
-
-/**
- * Return TRUE if $name is entity field
- */
-function _parser_is_entity_field($name, $instance) {
-  /*if ($entity_properties[]) {
-    
-  }*/
 }
 
 /**

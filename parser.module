@@ -576,7 +576,7 @@ function parser_parse($job, &$context) {
       $field_is_multi_value = ($property_is_field && $field_info['cardinality'] != 1);
       
       // Preprocess for fields by type
-      if ($property_is_field) {
+      if ($property_is_field && $result) {
         $function = '_parser_preprocess_field_' . $field_info['type'];
         if (function_exists($function)) {
           if ($field_is_multi_value) {
@@ -594,36 +594,34 @@ function parser_parse($job, &$context) {
         _parser_set_property($entity_wrapper, $property_name, $result, $property_is_compound, $field_is_multi_value);
       }
       catch (Exception $e) {
-        watchdog('parser', 'Ошибка при обновлении свойства "' . $property_name . '": ' . $e->getMessage() . '<pre>' . htmlspecialchars(print_r($result, TRUE)) . '</pre>', array(), WATCHDOG_ERROR);
+        watchdog('parser', 'Ошибка при обновлении свойства "' . $property_name . '": ' . $e->getMessage() . '<pre>' . check_plain(print_r($result, TRUE)) . '</pre>', array(), WATCHDOG_ERROR);
       }
     }
     
-    if ($entity) {
-      // Set Path alias
-      if ($job->save_url && !isset($entity->path)) {
-        $entity->path = array(
-          'alias' => trim($parsed_url['path'], '/'),
-          'language' => LANGUAGE_NONE,
-        );
-      }
-      
-      if ($job->prepare_code) {
-        eval($job->prepare_code);
-      }
-      entity_save($job->entity_type, $entity);
-      
-      $entity_id = entity_id($job->entity_type, $entity);
-      
-      _parser_map_save(array(
-        'entity_id' => $entity_id,
-        'jid' => $job->jid,
-        'url' => $page_url,
-        'page_key' => $page_key,
-      ));
-    
-      $context['sandbox']['entity_ids'][] = $entity_id;
-      $context['sandbox']['created_entities']++;
+    // Set Path alias
+    if ($job->save_url && !isset($entity->path)) {
+      $entity->path = array(
+        'alias' => trim($parsed_url['path'], '/'),
+        'language' => LANGUAGE_NONE,
+      );
     }
+    
+    if ($job->prepare_code) {
+      eval($job->prepare_code);
+    }
+    
+    $entity_wrapper->save();
+    $entity_id = $entity_wrapper->getIdentifier();
+    
+    _parser_map_save(array(
+      'entity_id' => $entity_id,
+      'jid' => $job->jid,
+      'url' => $page_url,
+      'page_key' => $page_key,
+    ));
+    
+    $context['sandbox']['entity_ids'][] = $entity_id;
+    $context['sandbox']['created_entities']++;
   }
   
   _parser_url_mark_parsed($page_url);
@@ -820,6 +818,29 @@ function parser_get_entity_id_by_page_key($page_key, $jid = NULL) {
   }
   
   return $query->execute()->fetchField();
+}
+
+/**
+ * Implements hook_entity_property_info_alter()
+ */
+function parser_entity_property_info_alter(&$info) {
+  foreach ($info as $entity_type => $properties) {
+    if (!isset($properties['bundles'])) {
+      continue;
+    }
+    
+    foreach ($properties['bundles'] as $bundle => $bundle_properties) {
+      foreach ($bundle_properties['properties'] as $property_name => $property_info) {
+        if (
+          ($property_info['type'] == 'text_formatted' || $property_info['type'] == 'list<text_formatted>') &&
+          isset($property_info['property info']['format']) && 
+          empty($property_info['property info']['format']['setter callback'])
+        ) {
+          $info[$entity_type]['bundles'][$bundle]['properties'][$property_name]['property info']['format']['setter callback'] = 'entity_property_verbatim_set';
+        }
+      }
+    }
+  }
 }
 
 /**
@@ -1082,16 +1103,21 @@ function _parser_set_property($entity_wrapper, $property_name, $property_value, 
     // Multi-value compound property
     if ($property_is_multi_value) {
       $entity_wrapper->{$property_name}->set(array());
-      foreach ($property_value as $delta => $property_item) {
-        foreach ($property_item as $sub_property_name => $sub_property_value) {
-          $entity_wrapper->{$property_name}[$delta]->{$sub_property_name} = $sub_property_value;
+      if ($property_value) {
+        foreach ($property_value as $delta => $property_item) {
+          foreach ($property_item as $sub_property_name => $sub_property_value) {
+            $entity_wrapper->{$property_name}[$delta]->{$sub_property_name} = $sub_property_value;
+          }
         }
       }
     }
     // Single-value compound property
     else {
-      foreach ($property_value as $sub_property_name => $sub_property_value) {
-        $entity_wrapper->{$property_name}->{$sub_property_name} = $sub_property_value;
+      $entity_wrapper->{$property_name} = NULL;
+      if ($property_value) {
+        foreach ($property_value as $sub_property_name => $sub_property_value) {
+          $entity_wrapper->{$property_name}->{$sub_property_name} = $sub_property_value;
+        }
       }
     }
   }
@@ -1099,8 +1125,10 @@ function _parser_set_property($entity_wrapper, $property_name, $property_value, 
     // Multi-value simple property
     if ($property_is_multi_value) {
       $entity_wrapper->{$property_name}->set(array());
-      foreach ($property_value as $delta => $property_item) {
-        $entity_wrapper->{$property_name}[$delta] = $property_item;
+      if ($property_value) {
+        foreach ($property_value as $delta => $property_item) {
+          $entity_wrapper->{$property_name}[$delta] = $property_item;
+        }
       }
     }
     // Single-value simple property

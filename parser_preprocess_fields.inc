@@ -23,7 +23,7 @@ function _parser_preprocess_field_text_with_summary(&$result, $field_info, $fiel
     $result['summary'] = trim($result['summary']);
   }
   if (empty($result['format'])) {
-    //$result['format'] = 'filtered_html';
+    $result['format'] = 'filtered_html';
   }
 }
 
@@ -70,7 +70,7 @@ function _parser_preprocess_field_file(&$result, $field_info, $field_instance, $
     foreach ($field_values as $field_value) {
       // If file already attached
       if ($field_value['filename'] == $file_name) {
-        $result['file'] = $field_value;
+        $result['file'] = $field_value['fid'];
         return;
       }
     }
@@ -118,7 +118,7 @@ function _parser_preprocess_field_file(&$result, $field_info, $field_instance, $
   $file_path = file_stream_wrapper_uri_normalize($dest_dir . '/' . $file_name);
   $file = file_copy($file, $file_path);
   if ($file) {
-    $result['file'] = $file;
+    $result['file'] = $file->fid;
   }
   else {
     $result = NULL;
@@ -129,7 +129,7 @@ function _parser_preprocess_field_file(&$result, $field_info, $field_instance, $
 /**
  * Preprocess field type "image"
  */
-function _parser_preprocess_field_image_(&$result, $field_info, $field_instance, $entity, $job, $page_url, &$context_results) {
+function _parser_preprocess_field_image(&$result, $field_info, $field_instance, $entity, $job, $page_url, &$context_results) {
   _parser_preprocess_field_file($result, $field_info, $field_instance, $entity, $job, $page_url, $context_results);
 }
 

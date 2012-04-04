@@ -105,9 +105,7 @@ function parser_job_form($form, &$form_state, $job) {
   $bundle_key = $entity_keys['bundle'];
   $label_key = isset($entity_keys['label']) ? $entity_keys['label'] : '';
   
-  $entity_properties_and_fields = entity_get_property_info($entity_type_value);
-  $entity_properties = $entity_properties_and_fields['properties'];
-  $entity_properties_fields = $entity_properties_and_fields['bundles'][$bundle_value]['properties'];
+  list($entity_properties, $entity_properties_fields) = _parser_get_entity_properties($entity_type_value, $bundle_value);
   if ($entity_type_value == 'taxonomy_term') {
     unset($entity_properties['vocabulary']);
   }
@@ -233,6 +231,8 @@ function parser_job_form($form, &$form_state, $job) {
   );
   
   // Properties & Fields
+  //dsm($entity_properties);
+  //dsm($entity_properties_fields);
   foreach (($entity_properties + $entity_properties_fields) as $property_name => $property_info) {
     if (!empty($property_info['computed']) || !isset($property_info['setter callback'])) {
       continue;
@@ -363,7 +363,14 @@ function parser_job_form($form, &$form_state, $job) {
   $form['advanced_settings']['prepare_code'] = array(
     '#type' => 'textarea',
     '#title' => 'Пост-обработка сущности',
-    '#description' => 'Код, который будет выполнен перед вызовом entity_save(). Доступные переменные: $entity - объект сущности, $page - html код страницы, $doc - объект phpQuery. Пример заполнения: <code>$entity->title = \'new title\';</code>',
+    '#description' => '
+      Код, который будет выполнен перед вызовом entity_save(). Доступные переменные:
+        $entity - объект сущности,
+        $entity_wrapper - entity metadata wrapper,
+        $page - html код страницы,
+        $doc - объект phpQuery.
+      Пример заполнения: <code>$entity->title = \'new title\';</code>
+    ',
     '#default_value' => isset($job->prepare_code) ? $job->prepare_code : '',
     '#rows' => 3,
     '#resizable' => FALSE,
@@ -537,11 +544,12 @@ function parser_parse($job, &$context) {
   
   // Parse page
   if ($allowed_parse) {
+    module_load_include('inc', 'parser', 'parser_prepare_field');
+    module_load_include('inc', 'parser', 'parser_prepare_entity');
+    
     $fields_info = field_info_fields();
     $fields_instances = field_info_instances($job->entity_type, $job->bundle);
-    $entity_properties_and_fields = entity_get_property_info($job->entity_type);
-    $entity_properties = $entity_properties_and_fields['properties'];
-    $entity_properties_fields = $entity_properties_and_fields['bundles'][$job->bundle]['properties'];
+    list($entity_properties, $entity_properties_fields) = _parser_get_entity_properties($job->entity_type, $job->bundle);
     
     // Load entity
     if ($entity_id) {
@@ -551,16 +559,10 @@ function parser_parse($job, &$context) {
     // Create entity object
     if (!$entity_id || !$entity) {
       $entity = entity_create($job->entity_type, array($entity_type_info['entity keys']['bundle'] => $job->bundle));
-      
-      if ($job->entity_type == 'taxonomy_term') {
-        $entity->vid = taxonomy_vocabulary_machine_name_load($job->bundle)->vid;
-      }
-      
       $context['results']['created_entities']++;
     }
     
     $entity_wrapper = entity_metadata_wrapper($job->entity_type, $entity);
-    module_load_include('inc', 'parser', 'parser_preprocess_fields');
     
     // Populate properties and fields
     foreach ($job->fields_code as $property_name => $php_code) {
@@ -575,9 +577,9 @@ function parser_parse($job, &$context) {
       $field_info = $property_is_field ? $fields_info[$property_name] : NULL;
       $field_is_multi_value = ($property_is_field && $field_info['cardinality'] != 1);
       
-      // Preprocess for fields by type
+      // Prepare fields
       if ($property_is_field && $result) {
-        $function = '_parser_preprocess_field_' . $field_info['type'];
+        $function = '_parser_prepare_field_' . $field_info['type'];
         if (function_exists($function)) {
           if ($field_is_multi_value) {
             foreach (array_keys($result) as $key) {
@@ -590,12 +592,7 @@ function parser_parse($job, &$context) {
         }
       }
       
-      try {
-        _parser_set_property($entity_wrapper, $property_name, $result, $property_is_compound, $field_is_multi_value);
-      }
-      catch (Exception $e) {
-        watchdog('parser', 'Ошибка при обновлении свойства "' . $property_name . '": ' . $e->getMessage() . '<pre>' . check_plain(print_r($result, TRUE)) . '</pre>', array(), WATCHDOG_ERROR);
-      }
+      _parser_set_property($entity_wrapper, $property_name, $result, $property_is_compound, $field_is_multi_value);
     }
     
     // Set Path alias
@@ -606,6 +603,11 @@ function parser_parse($job, &$context) {
       );
     }
     
+    // Prepare entity
+    $function = '_parser_prepare_entity_' . $job->entity_type;
+    if (function_exists($function)) {
+      $function($entity, $entity_wrapper);
+    }
     if ($job->prepare_code) {
       eval($job->prepare_code);
     }
@@ -825,21 +827,31 @@ function parser_get_entity_id_by_page_key($page_key, $jid = NULL) {
  */
 function parser_entity_property_info_alter(&$info) {
   foreach ($info as $entity_type => $properties) {
-    if (!isset($properties['bundles'])) {
-      continue;
-    }
-    
-    foreach ($properties['bundles'] as $bundle => $bundle_properties) {
-      foreach ($bundle_properties['properties'] as $property_name => $property_info) {
-        if (
-          ($property_info['type'] == 'text_formatted' || $property_info['type'] == 'list<text_formatted>') &&
-          isset($property_info['property info']['format']) && 
-          empty($property_info['property info']['format']['setter callback'])
-        ) {
-          $info[$entity_type]['bundles'][$bundle]['properties'][$property_name]['property info']['format']['setter callback'] = 'entity_property_verbatim_set';
+    if (isset($properties['bundles'])) {
+      foreach ($properties['bundles'] as $bundle => $bundle_properties) {
+        foreach ($bundle_properties['properties'] as $property_name => $property_info) {
+          _parser_set_format_setter_callback($info[$entity_type]['bundles'][$bundle]['properties'][$property_name]);
         }
       }
     }
+    
+    foreach ($properties['properties'] as $property_name => $property_info) {
+      _parser_set_format_setter_callback($info[$entity_type]['properties'][$property_name]);
+    }
+  }
+}
+
+/**
+ * Set setter callback
+ */
+function _parser_set_format_setter_callback(&$property_info) {
+  if (
+    isset($property_info['type']) &&
+    ($property_info['type'] == 'text_formatted' || $property_info['type'] == 'list<text_formatted>') &&
+    isset($property_info['property info']['format']) && 
+    !isset($property_info['property info']['format']['setter callback'])
+  ) {
+    $property_info['property info']['format']['setter callback'] = 'entity_property_verbatim_set';
   }
 }
 
@@ -1099,41 +1111,61 @@ function _parcer_spaces($count) {
  * Set entity property
  */
 function _parser_set_property($entity_wrapper, $property_name, $property_value, $property_is_compound, $property_is_multi_value) {
-  if ($property_is_compound) {
-    // Multi-value compound property
-    if ($property_is_multi_value) {
-      $entity_wrapper->{$property_name}->set(array());
-      if ($property_value) {
-        foreach ($property_value as $delta => $property_item) {
-          foreach ($property_item as $sub_property_name => $sub_property_value) {
-            $entity_wrapper->{$property_name}[$delta]->{$sub_property_name} = $sub_property_value;
-          }
+  // Multi-value compound property
+  if ($property_is_multi_value && $property_is_compound && $property_value) {
+    foreach ($property_value as $delta => $property_item) {
+      foreach ($property_item as $sub_property_name => $sub_property_value) {
+        try {
+          $entity_wrapper->{$property_name}[$delta]->{$sub_property_name} = $sub_property_value;
         }
-      }
-    }
-    // Single-value compound property
-    else {
-      $entity_wrapper->{$property_name} = NULL;
-      if ($property_value) {
-        foreach ($property_value as $sub_property_name => $sub_property_value) {
-          $entity_wrapper->{$property_name}->{$sub_property_name} = $sub_property_value;
+        catch (Exception $e) {
+          watchdog('parser', 'Ошибка при записи в $entity_wrapper->' . $property_name . '[' . $delta . ']->' . $sub_property_name . ': ' . $e->getMessage() . '<pre>' . check_plain(print_r($sub_property_value, TRUE)) . '</pre>', array(), WATCHDOG_ERROR);
         }
       }
     }
   }
-  else {
-    // Multi-value simple property
-    if ($property_is_multi_value) {
-      $entity_wrapper->{$property_name}->set(array());
-      if ($property_value) {
-        foreach ($property_value as $delta => $property_item) {
-          $entity_wrapper->{$property_name}[$delta] = $property_item;
-        }
+  // Single-value compound property
+  else if (!$property_is_multi_value && $property_is_compound && $property_value) {
+    foreach ($property_value as $sub_property_name => $sub_property_value) {
+      try {
+        $entity_wrapper->{$property_name}->{$sub_property_name} = $sub_property_value;
+      }
+      catch (Exception $e) {
+        watchdog('parser', 'Ошибка при записи в $entity_wrapper->' . $property_name . '->' . $sub_property_name . ': ' . $e->getMessage() . '<pre>' . check_plain(print_r($sub_property_value, TRUE)) . '</pre>', array(), WATCHDOG_ERROR);
       }
     }
-    // Single-value simple property
-    else {
+  }
+  // Multi-value simple property
+  else if ($property_is_multi_value && !$property_is_compound && $property_value) {
+    foreach ($property_value as $delta => $property_item) {
+      try {
+        $entity_wrapper->{$property_name}[$delta] = $property_item;
+      }
+      catch (Exception $e) {
+        watchdog('parser', 'Ошибка при записи в $entity_wrapper->' . $property_name . '[' . $delta . ']: ' . $e->getMessage() . '<pre>' . check_plain(print_r($property_item, TRUE)) . '</pre>', array(), WATCHDOG_ERROR);
+      }
+    }
+  }
+  // Single-value simple property
+  else if (!$property_is_multi_value && !$property_is_compound) {
+    try {
       $entity_wrapper->{$property_name} = $property_value;
+    }
+    catch (Exception $e) {
+      watchdog('parser', 'Ошибка при записи в $entity_wrapper->' . $property_name . ': ' . $e->getMessage() . '<pre>' . check_plain(print_r($property_value, TRUE)) . '</pre>', array(), WATCHDOG_ERROR);
     }
   }
 }
+
+/**
+ * Return entity type properties
+ */
+function _parser_get_entity_properties($entity_type, $bundle) {
+  $entity_properties_and_fields = entity_get_property_info($entity_type);
+  $entity_properties = $entity_properties_and_fields['properties'];
+  $entity_properties_fields = isset($entity_properties_and_fields['bundles'])
+    ? $entity_properties_and_fields['bundles'][$bundle]['properties']
+    : array();
+  return array($entity_properties, $entity_properties_fields);
+}
+

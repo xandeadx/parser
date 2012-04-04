@@ -1,9 +1,9 @@
 <?php
 
 /**
- * Preprocess field type "text"
+ * Prepare field type "text"
  */
-function _parser_preprocess_field_text(&$result, $field_info, $field_instance, $entity, $job, $page_url, &$context_results) {
+function _parser_prepare_field_text(&$result, $field_info, $field_instance, $entity, $job, $page_url, &$context_results) {
   $result = trim($result);
   if (!empty($field_info['settings']['max_length']) && drupal_strlen($result) > $field_info['settings']['max_length']) {
     $original_result = $result;
@@ -13,9 +13,9 @@ function _parser_preprocess_field_text(&$result, $field_info, $field_instance, $
 }
 
 /**
- * Preprocess field type "text_with_summary"
+ * Prepare field type "text_with_summary"
  */
-function _parser_preprocess_field_text_with_summary(&$result, $field_info, $field_instance, $entity, $job, $page_url, &$context_results) {
+function _parser_prepare_field_text_with_summary(&$result, $field_info, $field_instance, $entity, $job, $page_url, &$context_results) {
   if (!empty($result['value'])) {
     $result['value'] = trim($result['value']);
   }
@@ -28,9 +28,9 @@ function _parser_preprocess_field_text_with_summary(&$result, $field_info, $fiel
 }
 
 /**
- * Preprocess field type "taxonomy_term_reference"
+ * Prepare field type "taxonomy_term_reference"
  */
-function _parser_preprocess_field_taxonomy_term_reference(&$result, $field_info, $field_instance, $entity, $job, $page_url, &$context_results) {
+function _parser_prepare_field_taxonomy_term_reference(&$result, $field_info, $field_instance, $entity, $job, $page_url, &$context_results) {
   if (is_string($result)) {
     $voc_machine_name = $field_info['settings']['allowed_values'][0]['vocabulary'];
     $vid = taxonomy_vocabulary_machine_name_load($voc_machine_name)->vid;
@@ -45,15 +45,14 @@ function _parser_preprocess_field_taxonomy_term_reference(&$result, $field_info,
 }
 
 /**
- * Preprocess field type "file"
+ * Prepare field type "file"
  */
-function _parser_preprocess_field_file(&$result, $field_info, $field_instance, $entity, $job, $page_url, &$context_results) {
+function _parser_prepare_field_file(&$result, $field_info, $field_instance, $entity, $job, $page_url, &$context_results) {
   if (is_numeric($result['file'])) {
     return;
   }
   
-  $file_url = $result['file'];
-  $file_url = _parser_get_full_url($file_url, $page_url);
+  $file_url = _parser_get_full_url($result['file'], $page_url);
   $file_name = drupal_basename($file_url);
   $file_ext = pathinfo($file_name, PATHINFO_EXTENSION);
   if (function_exists('transliteration_clean_filename')) {
@@ -127,37 +126,9 @@ function _parser_preprocess_field_file(&$result, $field_info, $field_instance, $
 }
 
 /**
- * Preprocess field type "image"
+ * Prepare field type "image"
  */
-function _parser_preprocess_field_image(&$result, $field_info, $field_instance, $entity, $job, $page_url, &$context_results) {
-  _parser_preprocess_field_file($result, $field_info, $field_instance, $entity, $job, $page_url, $context_results);
+function _parser_prepare_field_image(&$result, $field_info, $field_instance, $entity, $job, $page_url, &$context_results) {
+  _parser_prepare_field_file($result, $field_info, $field_instance, $entity, $job, $page_url, $context_results);
 }
 
-/**
- * Preprocess field type "list_text"
- */
-function _parser_attach_field_list_text(&$result, $field_info, $field_instance, $entity, $job, $page_url, &$context_results) {
-  if (!is_array($field_values)) {
-    $field_values = array($field_values);
-  }
-  if (isset($entity->{$field_name})) {
-    unset($entity->{$field_name});
-  }
-
-  $allowed_values = $field_info['settings']['allowed_values'];
-  foreach ($field_values as $field_value) {
-    $field_value = trim($field_value);
-    
-    if (!isset($allowed_values[$field_value])) {
-      $key = array_search($field_value, $allowed_values, TRUE);
-      if ($key !== FALSE) {
-        $field_value = $key;
-      }
-      else {
-        continue;
-      }
-    }
-  
-    $entity->{$field_name}[LANGUAGE_NONE][]['value'] = $field_value;
-  }
-}

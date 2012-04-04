@@ -217,14 +217,17 @@ function parser_install() {
         'return array(' . "\n" .
         '  \'value\' => $content->html(),' . "\n" .
         '  \'format\' => \'full_html\',' . "\n" .
-        ');' . "\n",
+        ');',
       'field_tags' => '' .
         '$terms = array();' . "\n" .
         'foreach ($doc->find(\'.project-info a[href^="/taxonomy/term/"]\') as $a) {' . "\n" .
         '  $terms[] = pq($a)->text();' . "\n" .
         '}' . "\n" .
         'return $terms;',
-      'field_image' => 'return $doc->find(\'.image-thumbnail\')->attr(\'src\');',
+      'field_image' => '' . 
+        'return array(' . "\n" . 
+        '  \'file\' => $doc->find(\'.image-thumbnail\')->attr(\'src\'),' . "\n" .
+        ');',
       'author' => 'return 1;',
     ),
     'prepare_code' => '',

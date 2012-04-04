@@ -236,8 +236,6 @@ function parser_job_form($form, &$form_state, $job) {
   );
   
   // Properties & Fields
-  //dsm($entity_properties);
-  //dsm($entity_properties_fields);
   foreach (($entity_properties + $entity_properties_fields) as $property_name => $property_info) {
     if (!empty($property_info['computed']) || !isset($property_info['setter callback'])) {
       continue;
@@ -878,7 +876,6 @@ function _parser_url_get_not_parsed() {
   return db_select('parser_urls', 'pu')
     ->fields('pu')
     ->condition('parsed', 0)
-    //->orderBy('depth', 'DESC')
     ->range(0, 1)
     ->execute()
     ->fetchObject();

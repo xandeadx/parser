@@ -222,10 +222,15 @@ function parser_job_form($form, &$form_state, $job) {
     '#type' => 'fieldset',
     '#title' => 'Поля',
     '#description' => '
-      <p>Поля заполняются без обёртки кода в &lt;?php и ?&gt;. Во всех полях доступны три переменные $doc - объект phpQuery, $page - html код страницы, $page_url - адрес страницы без учёта
-      редиректов. Оставьте textarea пустым, если поле заполнять не нужно.<p><p>Если появляются проблемы с кодировкой, то попробуйте сменить значение в поле <i>Кодировка сайта</i>, либо включите
-      опцию <i>Передовать кодировку в конструктор phpQuery</i>, либо используйте функцию <a href="http://www.php.net/manual/ru/function.iconv.php" target="_blank">iconv()</a>, для ручной
-      конвертации текста. Например: <code style="font-size:.9em;">return iconv(\'WINDOWS-1251\', \'UTF-8\', $doc->find(\'selector\')->text());</code></p>
+      <p>Поля заполняются без обёртки кода в &lt;?php и ?&gt;. Во всех полях доступны следующие переменные:</p>
+      <p>
+        $doc - объект phpQuery<br />
+        $page - html код страницы<br />
+        $page_url - адрес страницы без учёта редиректов<br />
+        $entity - объект сущности<br />
+        $entity_wrapper - entity metadata wrapper<br />
+      </p>
+      <p>Оставьте textarea пустым, если поле заполнять не нужно.</p>
     ',
     '#tree' => TRUE,
   );

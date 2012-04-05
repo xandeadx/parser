@@ -216,9 +216,6 @@ function parser_job_form($form, &$form_state, $job) {
   $form['fields_wrapper'] = array(
     '#prefix' => '<div id="fields-code-wrapper">',
     '#suffix' => '</div>',
-  );
-  
-  $form['fields_wrapper']['fields_code'] = array(
     '#type' => 'fieldset',
     '#title' => 'Поля',
     '#description' => '
@@ -232,8 +229,10 @@ function parser_job_form($form, &$form_state, $job) {
       </p>
       <p>Оставьте textarea пустым, если поле заполнять не нужно.</p>
     ',
-    '#tree' => TRUE,
   );
+  
+  $form['fields_wrapper']['vertical_tabs'] = array('#type' => 'vertical_tabs');
+  $form['fields_wrapper']['fields_code'] = array('#tree' => TRUE);
   
   // Properties & Fields
   foreach (($entity_properties + $entity_properties_fields) as $property_name => $property_info) {
@@ -253,6 +252,7 @@ function parser_job_form($form, &$form_state, $job) {
       '#collapsible' => TRUE,
       '#collapsed' => TRUE,
       '#weight' => (!empty($property_info['required']) || !empty($property_info['field'])) ? $weight : $weight + 100,
+      '#group' => 'vertical_tabs',
     );
     
     $description = 'PHP код, который должен вернуть ' . ($this_property_is_multi_value ? 'массив значений' : 'значение') . ' поля';

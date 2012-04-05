@@ -42,9 +42,9 @@
         });
         
       }).addClass('codemirror-processed');
-      
-      // Refresh code mirror on fieldset collapsed
-      $('.fieldset-title:not(.codemirror-refreshed)', context).click(function() {
+
+      // Refresh code mirror on open vertical tab
+      $('.vertical-tab-button a:not(.codemirror-refreshed)', context).click(function() {
         for (i in codeMirrors) {
           codeMirrors[i].refresh();
         }

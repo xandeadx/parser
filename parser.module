@@ -962,8 +962,8 @@ function _parser_get_page_by_url($url, $charset = 'auto', $skip_cache = FALSE, &
   
   // Convert charset
   if ($charset == 'auto') {
-    if (preg_match('#<meta http-equiv="Content-Type" content="text/html; charset=([^"])"+#iU', $page, $matches) && drupal_strtolower($matches[1]) != 'utf-8') {
-      $page = iconv($matches[1], 'UTF-8', $page);
+    if (preg_match('#<meta http-equiv="Content-Type" content="text/html; charset=(.+)"#isU', $page, $matches) && drupal_strtolower($matches[1]) != 'utf-8') {
+      $page = iconv($matches[1], 'UTF-8//IGNORE', $page);
       $page = str_ireplace(
         '<meta http-equiv="Content-Type" content="text/html; charset=' . $matches[1] . '"',
         '<meta http-equiv="Content-Type" content="text/html; charset=utf-8"',

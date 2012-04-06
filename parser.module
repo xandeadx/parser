@@ -1036,18 +1036,26 @@ function _parser_get_full_url($url, $page_url) {
   $url = trim($url);
   $url = preg_replace('/#.+/', '', $url);
   $page_url_parsed = parse_url($page_url);
+  if (!isset($page_url_parsed['path'])) {
+    $page_url_parsed['path'] = '/';
+  }
 
-  if (substr($url, 0, 1) == '/') {
+  // example: //wikimedia.org/dir/image.png
+  if (substr($url, 0, 2) == '//') {
+    $url = $page_url_parsed['scheme'] . ':' . $url;
+  }
+  // example: /dir/image.png
+  elseif (substr($url, 0, 1) == '/') {
     $url = $page_url_parsed['scheme'] . '://' . $page_url_parsed['host'] . $url;
   }
+  // example: dir/image.png
   elseif (strpos($url, 'http') !== 0) {
-    $page_url = rtrim($page_url, '/');
-    $page_url = preg_replace('#/[^/]+$#', '', $page_url);
-    $url = $page_url . '/' . $url;
+    $path = preg_replace('#/[^/]+$#', '', $page_url_parsed['path']);
+    $path = ltrim($path, '/');
+    $url = $page_url_parsed['scheme'] . '://' . $page_url_parsed['host'] . '/' . $path . $url;
   }
   
   $url = str_replace(' ', '+', $url);
-  $url = current(explode('#', $url));
   
   return $url;
 }

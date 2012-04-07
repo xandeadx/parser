@@ -96,7 +96,7 @@ function parser_job_form($form, &$form_state, $job) {
     $bundle_options[$bundle_name] = $bundle_info['label'];
   }
   
-  $bundle_value = isset($job->bundle) ? $job->bundle : key($bundle_options);
+  $bundle_value = (isset($job->bundle) && isset($bundle_options[$job->bundle])) ? $job->bundle : key($bundle_options);
   if (isset($form_state['values']['bundle']) && isset($bundle_options[$form_state['values']['bundle']])) {
     $bundle_value = $form_state['values']['bundle'];
   }

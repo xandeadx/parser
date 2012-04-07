@@ -322,7 +322,7 @@ function parser_job_form($form, &$form_state, $job) {
   $form['advanced_settings']['site_charset'] = array(
     '#type' => 'select',
     '#title' => 'Кодировка сайта',
-    '#description' => 'Выберите кодировку, которая используется на сайте. Рекомендуется автоопределение.',
+    '#description' => 'Выберите кодировку, которая используется на удалённом сайте. Рекомендуется автоопределение.',
     '#options' => array('auto' => 'Автоопределение', 'UTF-8' => 'UTF-8', 'WINDOWS-1251' => 'WINDOWS-1251'),
     '#default_value' => isset($job->site_charset) ? $job->site_charset : 'auto',
   );
@@ -330,7 +330,7 @@ function parser_job_form($form, &$form_state, $job) {
   $form['advanced_settings']['charset_fix'] = array(
     '#type' => 'checkbox',
     '#title' => 'Передавать кодировку в конструктор phpQuery',
-    '#description' => 'Отметьте эту опцию, если возникают проблемы с кодировкой. Костыль для phpQuery.',
+    '#description' => 'Отметьте, если возникают проблемы с кодировкой. Костыль!',
     '#default_value' => isset($job->charset_fix) ? $job->charset_fix : FALSE,
   );
   
@@ -352,7 +352,7 @@ function parser_job_form($form, &$form_state, $job) {
   $form['advanced_settings']['no_update'] = array(
     '#type' => 'checkbox',
     '#title' => 'Не обновлять сущности',
-    '#description' => 'Отметьте, если не хотите обновлять ноды, созданные в предыдущие запуски этого задания.',
+    '#description' => 'Отметьте, если не хотите обновлять сущности, созданные в предыдущие запуски этого задания.',
     '#default_value' => isset($job->no_update) ? $job->no_update : 0,
   );
   

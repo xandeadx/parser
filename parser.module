@@ -201,7 +201,7 @@ function parser_job_form($form, &$form_state, $job) {
   $form['bundle'] = array(
     '#type' => 'select',
     '#title' => 'Тип (bundle)',
-    '#description' => 'Выберите тип сущности, который будет создавать парсер.',
+    '#description' => 'Выберите подтип сущности, который будет создавать парсер.',
     '#options' => $bundle_options,
     '#default_value' => isset($job->bundle) ? $job->bundle : key($bundle_options),
     '#required' => TRUE,

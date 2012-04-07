@@ -188,7 +188,7 @@ function parser_job_form($form, &$form_state, $job) {
   // Entity type
   $form['entity_type'] = array(
     '#type' => 'select',
-    '#title' => 'Сущность',
+    '#title' => 'Тип сущности (entity type)',
     '#description' => 'Выберите тип сущности, которую будет создавать парсер.',
     '#options' => $entity_type_options,
     '#default_value' => isset($job->entity_type) ? $job->entity_type : 'node',
@@ -200,7 +200,7 @@ function parser_job_form($form, &$form_state, $job) {
   // Bundle
   $form['bundle'] = array(
     '#type' => 'select',
-    '#title' => 'Подтип (bundle)',
+    '#title' => 'Подтип сущности (bundle)',
     '#description' => 'Выберите подтип сущности, который будет создавать парсер.',
     '#options' => $bundle_options,
     '#default_value' => isset($job->bundle) ? $job->bundle : key($bundle_options),

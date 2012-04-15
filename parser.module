@@ -189,7 +189,7 @@ function parser_job_form($form, &$form_state, $job) {
   $form['entity_type'] = array(
     '#type' => 'select',
     '#title' => 'Тип сущности (entity type)',
-    '#description' => 'Выберите тип сущности, которую будет создавать парсер.',
+    '#description' => 'Выберите тип сущности, который будет создавать парсер.',
     '#options' => $entity_type_options,
     '#default_value' => isset($job->entity_type) ? $job->entity_type : 'node',
     '#required' => TRUE,
@@ -1034,7 +1034,7 @@ function _parser_set_rows(&$form) {
  */
 function _parser_get_full_url($url, $page_url) {
   $url = trim($url);
-  $url = preg_replace('/#.+/', '', $url);
+  $url = preg_replace('/#.*/', '', $url);
   $page_url_parsed = parse_url($page_url);
   if (!isset($page_url_parsed['path'])) {
     $page_url_parsed['path'] = '/';

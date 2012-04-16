@@ -502,22 +502,22 @@ function parser_parse($job, &$context) {
     // Find links
     foreach ($doc->find('a') as $a) {
       $href = pq($a)->attr('href');
-      $href = _parser_get_full_url($href, $page_url);
+      $full_url = _parser_get_full_url($href, $page_url);
       
-      $allowed = TRUE;
-      if ($job->white_list) {
-        $allowed = drupal_match_path($href, $job->white_list) ? TRUE : FALSE;
+      if (strpos($href, 'javascript:') === 0) {
+        continue;
       }
-      if ($allowed && $job->black_list) {
-        $allowed = drupal_match_path($href, $job->black_list) ? FALSE : TRUE;
+      if ($job->white_list && !drupal_match_path($full_url, $job->white_list)) {
+        continue;
       }
-      if ($allowed && $job->only_this_domen) {
-        $parsed_href = parse_url($href);
-        $allowed = ($parsed_url['host'] == $parsed_href['host']);
+      if ($job->black_list && drupal_match_path($full_url, $job->black_list)) {
+        continue;
       }
-      if ($allowed) {
-        _parser_url_add($href, $url->depth + 1);
+      if ($job->only_this_domen && $parsed_url['host'] != parse_url($full_url, PHP_URL_HOST)) {
+        continue;
       }
+
+      _parser_url_add($full_url, $url->depth + 1, $page_url, $href);
     }
   }
 
@@ -884,12 +884,14 @@ function _parser_url_get_not_parsed() {
 /**
  * Adding URL to database
  */
-function _parser_url_add($url, $depth = 0) {
+function _parser_url_add($url, $depth = 0, $page_url = '', $href = '') {
   if (!_parser_url_get($url)) {
     db_insert('parser_urls')
       ->fields(array(
         'url' => $url,
         'depth' => $depth,
+        'page_url' => $page_url,
+        'href' => $href,
       ))
       ->execute();
   }

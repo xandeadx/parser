@@ -132,6 +132,19 @@ function parser_schema() {
         'type' => 'varchar',
         'length' => 255,
         'not null' => TRUE,
+        'default' => '',
+      ),
+      'page_url' => array(
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'href' => array(
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
       ),
       'depth' => array(
         'type' => 'int',
@@ -239,3 +252,23 @@ function parser_install() {
     file_prepare_directory($directory, FILE_CREATE_DIRECTORY);
   }
 }
+
+/**
+ * Add new cols to {parser_urls}
+ */
+function parser_update_7200() {
+  db_add_field('parser_urls', 'page_url', array(
+    'type' => 'varchar',
+    'length' => 255,
+    'not null' => TRUE,
+    'default' => '',
+  ));
+  
+  db_add_field('parser_urls', 'href', array(
+    'type' => 'varchar',
+    'length' => 255,
+    'not null' => TRUE,
+    'default' => '',
+  ));
+}
+

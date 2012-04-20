@@ -16,6 +16,9 @@ function _parser_prepare_field_text(&$result, $field_info, $field_instance, $ent
  * Prepare field type "text_with_summary"
  */
 function _parser_prepare_field_text_with_summary(&$result, $field_info, $field_instance, $entity, $job, $page_url, &$context_results) {
+  if ($result && !is_array($result)) {
+    $result = array('value' => $result);
+  }
   if (!empty($result['value'])) {
     $result['value'] = trim($result['value']);
   }

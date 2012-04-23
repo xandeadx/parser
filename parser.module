@@ -482,17 +482,15 @@ function parser_parse($job, &$context) {
     $context['results']['time_start'] = time();
     $context['results']['created_entities'] = 0;
     $context['results']['updated_entities'] = 0;
-    $context['results']['pages_from_http'] = 0;
-    $context['results']['error_pages_from_http'] = 0;
-    $context['results']['pages_from_cache'] = 0;
-    $context['results']['downloaded_files'] = 0;
+    $context['results']['files_from_http'] = 0;
+    $context['results']['files_from_http_error'] = 0;
     $context['results']['files_from_cache'] = 0;
   }
   
   $url = _parser_url_get_not_parsed();
   $page_url = $url->url;
-  $parsed_url = parse_url($page_url);
-  $page = _parser_get_page_by_url($page_url, $job->site_charset, FALSE, $context['results']);
+  $page_url_parsed = parse_url($page_url);
+  $page = _parser_get_page_by_url($page_url, $job->site_charset, $context['results']);
   $doc = _parser_create_phpquery($page, $job->charset_fix);
   $entity_id = parser_get_entity_id_by_url($page_url, $job->jid);
   $entity_type_info = entity_get_info($job->entity_type);
@@ -502,22 +500,35 @@ function parser_parse($job, &$context) {
     // Find links
     foreach ($doc->find('a') as $a) {
       $href = pq($a)->attr('href');
-      $full_url = _parser_get_full_url($href, $page_url);
+      $href_full = _parser_get_full_url($href, $page_url);
       
-      if (strpos($href, 'javascript:') === 0) {
+      if (!$href) {
         continue;
       }
-      if ($job->white_list && !drupal_match_path($full_url, $job->white_list)) {
+      if (drupal_substr($href, 0, 1) == '#') {
         continue;
       }
-      if ($job->black_list && drupal_match_path($full_url, $job->black_list)) {
+      if (preg_match('#^([a-z]+)://#', $href, $matches) && !in_array($matches[1], array('http', 'https'))) {
         continue;
       }
-      if ($job->only_this_domen && $parsed_url['host'] != parse_url($full_url, PHP_URL_HOST)) {
+      if (strpos($href, 'javascript:') === 0 || strpos($href, 'mailto:') === 0) {
         continue;
+      }
+      if ($job->white_list && !drupal_match_path($href_full, $job->white_list)) {
+        continue;
+      }
+      if ($job->black_list && drupal_match_path($href_full, $job->black_list)) {
+        continue;
+      }
+      if ($job->only_this_domen) {
+        $page_url_parsed_host = str_replace('www.', '', $page_url_parsed['host']);
+        $href_host = str_replace('www.', '', parse_url($href_full, PHP_URL_HOST));
+        if ($page_url_parsed_host != $href_host) {
+          continue;
+        }
       }
 
-      _parser_url_add($full_url, $url->depth + 1, $page_url, $href);
+      _parser_url_add($href_full, $url->depth + 1, $page_url, $href);
     }
   }
 
@@ -600,8 +611,10 @@ function parser_parse($job, &$context) {
     
     // Set Path alias
     if ($job->save_url && !isset($entity->path)) {
+      $alias = trim($page_url_parsed['path'], '/');
+      $alias = str_replace('%20', ' ', $alias);
       $entity->path = array(
-        'alias' => trim($parsed_url['path'], '/'),
+        'alias' => $alias,
         'language' => LANGUAGE_NONE,
       );
     }
@@ -615,18 +628,24 @@ function parser_parse($job, &$context) {
       eval($job->prepare_code);
     }
     
-    $entity_wrapper->save();
-    $entity_id = $entity_wrapper->getIdentifier();
+    try {
+      $entity_wrapper->save();
+    }
+    catch (Exception $e) {
+      watchdog('parser', 'Ошибка при сохранении сущности: ' . $e->getMessage() . '. <b>Адрес:</b> ' . check_plain($page_url) . ' <pre>' . check_plain(print_r($entity, TRUE)) . '</pre>', array(), WATCHDOG_ERROR);
+    }
     
-    _parser_map_save(array(
-      'entity_id' => $entity_id,
-      'jid' => $job->jid,
-      'url' => $page_url,
-      'page_key' => $page_key,
-    ));
-    
-    $context['sandbox']['entity_ids'][] = $entity_id;
-    $context['sandbox']['created_entities']++;
+    if ($entity_id = $entity_wrapper->getIdentifier()) {
+      _parser_map_save(array(
+        'entity_id' => $entity_id,
+        'jid' => $job->jid,
+        'url' => $page_url,
+        'page_key' => $page_key,
+      ));
+      
+      $context['sandbox']['entity_ids'][] = $entity_id;
+      $context['sandbox']['created_entities']++;
+    }
   }
   
   _parser_url_mark_parsed($page_url);
@@ -634,15 +653,14 @@ function parser_parse($job, &$context) {
   $context['sandbox']['max'] = _parser_url_count();
   $context['sandbox']['progress']++;
   $context['message'] = '
-    Завершён парсинг страницы <em>' . $page_url . '</em> с глубиной ' . $url->depth . '<br />
+    Завершён парсинг страницы глубиной ' . $url->depth . ' <em>' . $page_url . '</em><br />
+    Обработано страниц: ' . $context['sandbox']['progress'] . '<br />
     Страниц в очереди: ' . ($context['sandbox']['max'] - $context['sandbox']['progress']) . '<br />
     Создано сущностей: ' . $context['results']['created_entities'] . '<br />
     Обновлено сущностей: ' . $context['results']['updated_entities'] . '<br />
-    Скачано страниц: ' . $context['results']['pages_from_http'] . '<br />
-    Не удалось скачать страниц: ' . $context['results']['error_pages_from_http'] . '<br />
-    Страниц взято из кэша: ' . $context['results']['pages_from_cache'] . '<br />
-    Скачано файлов: ' . $context['results']['downloaded_files'] . '<br />
-    Файлов взято из кэша: ' . $context['results']['files_from_cache'] . '<br />
+    Скачано <abbr title="Страниц и файлов">url</abbr>: ' . $context['results']['files_from_http'] . '<br />
+    Не удалось скачать url: ' . $context['results']['files_from_http_error'] . '<br />
+    Url взято из кэша: ' . $context['results']['files_from_cache'] . '<br />
     Затраченное время: ' . gmdate('H:i:s', time() - $context['results']['time_start']) . '
   ';
 
@@ -661,10 +679,10 @@ function parser_finished($success, $results, $operations) {
   drupal_set_message('
     ' . ($success ? 'Парсинг закончен' : 'Парсинг закончился с ошибками') . '.
     Обработано страниц: ' . _parser_url_count(TRUE) . '.
-    Не удалось скачать страниц: ' . $results['error_pages_from_http'] . '.
+    Скачано URL: ' . $results['files_from_http'] . '.
+    Не удалось скачать URL: ' . $results['files_from_http_error'] . '.
     Создано сущностей: ' . l($results['created_entities'], 'admin/structure/parser_jobs/results/' . $results['jid']) . '.
     Обновлено сущностей: ' . l($results['updated_entities'], 'admin/structure/parser_jobs/results/' . $results['jid']) . '.
-    Скачано файлов: ' . $results['downloaded_files'] . '.
     Затрачено времени: ' . gmdate('H:i:s', time() - $results['time_start']) . '.
     ' . l('Посмотреть системный журнал', 'admin/reports/dblog') . '
   ');
@@ -845,6 +863,41 @@ function parser_entity_property_info_alter(&$info) {
 }
 
 /**
+ * Find images in html, download and change href
+ */
+function parser_download_images($html, $page_url, $path = 'public://images', &$stat = NULL) {
+  $doc = _parser_create_phpquery($html);
+  
+  foreach ($doc->find('img') as $img) {
+    $image_url = _parser_get_full_url(pq($img)->attr('src'), $page_url);
+    $image_url_parsed = parse_url($image_url);
+    $local_image_name = ltrim($image_url_parsed['path'], '/');
+    $local_image_name = str_replace('/', '-', $local_image_name);
+    
+    if (!file_exists($path . '/' . $local_image_name)) {
+      // Download image to cache
+      $cache_file_uri = _parser_download_url_to_cache($image_url, $stat);
+      if (!$cache_file_uri) {
+        continue;
+      }
+      
+      // Copy image from cache
+      $file = _parser_copy_file($cache_file_uri, $path . '/' . $local_image_name);
+      if ($file) {
+        $file->status = FILE_STATUS_PERMANENT;
+        file_save($file);
+      }
+    }
+    
+    $new_src = file_create_url($path . '/' . $local_image_name);
+    $new_src = drupal_substr($new_src, drupal_strlen($GLOBALS['base_root']));
+    pq($img)->attr('src', $new_src);
+  }
+  
+  return $doc->html();
+}
+
+/**
  * Set setter callback
  */
 function _parser_set_format_setter_callback(&$property_info) {
@@ -928,56 +981,71 @@ function _parser_url_count($parsed = null) {
 /**
  * Return page html by URL
  */
-function _parser_get_page_by_url($url, $charset = 'auto', $skip_cache = FALSE, &$results = NULL) {
-  $cache_uri = 'public://parser_cache/html/' . md5($url) . '.html';
+function _parser_get_page_by_url($url, $charset = 'auto', &$results = NULL) {
+  $page_cache_uri = _parser_download_url_to_cache($url, $results);
+  if (!$page_cache_uri) {
+    return NULL;
+  }
+  $page = file_get_contents($page_cache_uri);
+  
+  // Convert charset
+  if ($charset == 'auto') {
+    if (preg_match('# content="text/html; charset=(.+)"#isU', $page, $matches) && drupal_strtolower($matches[1]) != 'utf-8') {
+      $page = iconv($matches[1], 'UTF-8//IGNORE', $page);
+      $page = str_ireplace(
+        ' content="text/html; charset=' . $matches[1] . '"',
+        ' content="text/html; charset=utf-8"',
+        $page
+      );
+    }
+  }
+  else if ($charset != 'UTF-8') {
+    $page = iconv($charset, 'UTF-8//IGNORE', $page);
+  }
+      
+  return $page;
+}
 
-  if (!file_exists($cache_uri) || $skip_cache) {
+/**
+ * Download remote url to cache and return cache uri
+ */
+function _parser_download_url_to_cache($url, &$stat = NULL) {
+  $cache_uri = 'public://parser_cache/' . md5($url);
+  
+  if (!file_exists($cache_uri)) {
     $options = array('headers' => array('User-Agent' => 'Opera/9.80 (Windows NT 6.1; U; ru) Presto/2.8.131 Version/11.10')); 
     $result = drupal_http_request($url, $options);
     if ($result->code == 303 && !empty($result->headers['location'])) {
       $result = drupal_http_request($result->headers['location'], $options);
     }
     
-    if (!empty($result->data)) {
-      $page = $result->data;
-      file_unmanaged_save_data($page, $cache_uri);
-      
-      if ($results) {
-        $results['pages_from_http']++;
+    if (!empty($result->error)) {
+      watchdog('parser', 'Ошибка при закачке ' . check_plain($url) . ': ' . check_plain($result->error) . (isset($result->data) ? ', <b>Результат</b>: ' . check_plain(drupal_substr($result->data, 0, 1000)) : ''));
+      if ($stat) {
+        $stat['files_from_http_error']++;
       }
+      return NULL;
     }
-    else {
-      watchdog('parser', 'Не удалось скачать страницу ' . $url . (isset($result->error) ? '. Ошибка: ' . $result->error : ''), array(), WATCHDOG_ALERT);
-      
-      if ($results) {
-        $results['error_pages_from_http']++;
+    if (!$result->data) {
+      watchdog('parser', 'Ошибка при закачке ' . check_plain($url) . ': сервер не возвратил данных.');
+      if ($stat) {
+        $stat['files_from_http_error']++;
       }
+      return NULL;
     }
+    
+    file_unmanaged_save_data($result->data, $cache_uri);
+    if ($stat) {
+      $stat['files_from_http']++;
+    }
+    return $cache_uri;
   }
   else {
-    $page = file_get_contents($cache_uri);
-    
-    if ($results) {
-      $results['pages_from_cache']++;
+    if ($stat) {
+      $stat['files_from_cache']++;
     }
+    return $cache_uri;
   }
-  
-  // Convert charset
-  if ($charset == 'auto') {
-    if (preg_match('#<meta http-equiv="Content-Type" content="text/html; charset=(.+)"#isU', $page, $matches) && drupal_strtolower($matches[1]) != 'utf-8') {
-      $page = iconv($matches[1], 'UTF-8//IGNORE', $page);
-      $page = str_ireplace(
-        '<meta http-equiv="Content-Type" content="text/html; charset=' . $matches[1] . '"',
-        '<meta http-equiv="Content-Type" content="text/html; charset=utf-8"',
-        $page
-      );
-    }
-  }
-  else if ($charset != 'UTF-8') {
-    $page = iconv($charset, 'UTF-8', $page);
-  }
-      
-  return $page;
 }
 
 /**
@@ -1053,41 +1121,16 @@ function _parser_get_full_url($url, $page_url) {
   // example: dir/image.png
   elseif (strpos($url, 'http') !== 0) {
     $path = preg_replace('#/[^/]+$#', '', $page_url_parsed['path']);
-    $path = ltrim($path, '/');
+    $path = trim($path, '/');
+    if ($path) {
+      $path .= '/';
+    }
     $url = $page_url_parsed['scheme'] . '://' . $page_url_parsed['host'] . '/' . $path . $url;
   }
   
   $url = str_replace(' ', '+', $url);
   
   return $url;
-}
-
-/**
- * Download file to local storage
- */
-function _parser_download_file_use_curl($file_url, $destination) {
-  $ch = curl_init($file_url);
-  $fp = fopen(drupal_realpath($destination), 'wb');
-  curl_setopt($ch, CURLOPT_FILE, $fp);
-  curl_setopt($ch, CURLOPT_HEADER, 0);
-  curl_exec($ch);
-  $error = curl_error($ch);
-  curl_close($ch);
-  fclose($fp);
-  
-  return $error;
-}
-
-/**
- * Clear vocabulary
- */
-function _parser_clear_vocabulary($vocabulary_name) {
-  $vocabulary = taxonomy_vocabulary_machine_name_load($vocabulary_name);
-  $terms = taxonomy_get_tree($vocabulary->vid);
-
-  foreach ($terms as $term) {
-    taxonomy_term_delete($term->tid);
-  }
 }
 
 /**
@@ -1179,5 +1222,24 @@ function _parser_get_entity_properties($entity_type, $bundle) {
     ? $entity_properties_and_fields['bundles'][$bundle]['properties']
     : array();
   return array($entity_properties, $entity_properties_fields);
+}
+
+/**
+ * Copy file from cache and return file object
+ */
+function _parser_copy_file($from_uri, $to_uri) {
+  $file = (object)array(
+    'uid' => $GLOBALS['user']->uid,
+    'uri' => $from_uri,
+    'filename' => drupal_basename($to_uri),
+    'filemime' => file_get_mimetype($from_uri),
+  );
+  $file_path = file_stream_wrapper_uri_normalize($to_uri);
+  $file = file_copy($file, $file_path);
+  if (!$file) {
+    watchdog('parser', 'Ошибка при копировании файла <i>' . $file->uri  . '</i> в <i>' . $file_path . '</i>.');
+  }
+  
+  return $file;
 }
 

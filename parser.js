@@ -44,7 +44,7 @@
       }).addClass('codemirror-processed');
 
       // Refresh code mirror on open vertical tab
-      $('.vertical-tab-button a:not(.codemirror-refreshed)', context).click(function() {
+      $('.vertical-tab-button a:not(.codemirror-refreshed), .fieldset-legend a:not(.codemirror-refreshed)', context).click(function() {
         for (i in codeMirrors) {
           codeMirrors[i].refresh();
         }

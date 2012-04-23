@@ -50,7 +50,7 @@ function _parser_prepare_field_taxonomy_term_reference(&$result, $field_info, $f
 /**
  * Prepare field type "file"
  */
-function _parser_prepare_field_file(&$result, $field_info, $field_instance, $entity, $job, $page_url, &$context_results) {
+function _parser_prepare_field_file(&$result, $field_info, $field_instance, $entity, $job, $page_url, &$stat) {
   if (is_numeric($result['file'])) {
     return;
   }
@@ -80,51 +80,26 @@ function _parser_prepare_field_file(&$result, $field_info, $field_instance, $ent
   
   // Validate by extensions
   $allowed_file_extensions = explode(' ', $field_instance['settings']['file_extensions']);
-  if (!in_array($file_ext, $allowed_file_extensions)) {
+  if ($allowed_file_extensions && !in_array($file_ext, $allowed_file_extensions)) {
     watchdog('parser', 'Файл <i>' . check_plain($file_url) . '</i> закачан не будет, так как его тип не в списке допустимых.');
     $result = NULL;
-    return;
+    return NULL;
   }
   
-  $cache_uri = 'public://parser_cache/files/' . md5($file_url) . '.' . $file_ext;
-  if (!file_exists($cache_uri)) {
-    // Download remote file
-    $request_result = drupal_http_request($file_url);
-
-    if (!empty($request_result->error)) {
-      watchdog('parser', 'Ошибка при закачке файла. <b>Адрес</b>: ' . check_plain($file_url) . ', <b>Ошибка</b>: ' . $request_result->error . ', <b>Результат</b>: ' . check_plain($request_result->data));
-      $result = NULL;
-      return;
-    }
-    if (!$request_result->data) {
-      watchdog('parser', 'Ошибка при закачке файла. <b>Адрес</b>: ' . check_plain($file_url) . ', <b>Ошибка</b>: сервер не возвратил данных.');
-      $result = NULL;
-      return;
-    }
-  
-    // Save file to cache
-    file_unmanaged_save_data($request_result->data, $cache_uri);
-    $context_results['downloaded_files']++;
-  }
-  else {
-    $context_results['files_from_cache']++;
+  // Download file to cache
+  $cache_uri = _parser_download_url_to_cache($file_url, $stat);
+  if (!$cache_uri) {
+    $result = NULL;
+    return NULL;
   }
   
   // Copy file from cache to $dest_dir
-  $file = (object)array(
-    'uid' => $GLOBALS['user']->uid,
-    'uri' => $cache_uri,
-    'filename' => $file_name,
-    'filemime' => file_get_mimetype($cache_uri),
-  );
-  $file_path = file_stream_wrapper_uri_normalize($dest_dir . '/' . $file_name);
-  $file = file_copy($file, $file_path);
+  $file = _parser_copy_file($cache_uri, $dest_dir . '/' . $file_name);
   if ($file) {
     $result['file'] = $file->fid;
   }
   else {
     $result = NULL;
-    watchdog('parser', 'Ошибка при копировании файла <i>' . $file->uri  . '</i> в <i>' . $file_path . '</i>.');
   }
 }
 

@@ -200,6 +200,8 @@ function parser_schema() {
  * Implementation of hook_install().
  */
 function parser_install() {
+  file_prepare_directory($directory = 'public://parser_cache', FILE_CREATE_DIRECTORY);
+  
   $job = array(
     'title' => 'Парсинг шаблонов с drupal.org',
     'start_url' => 'http://drupal.org/project/themes',
@@ -246,11 +248,6 @@ function parser_install() {
     'prepare_code' => '',
   );
   entity_save('parser_job', $job);
-  
-  foreach (array('html', 'files') as $directory) {
-    $directory = 'public://parser_cache/' . $directory;
-    file_prepare_directory($directory, FILE_CREATE_DIRECTORY);
-  }
 }
 
 /**

@@ -51,6 +51,10 @@ function _parser_prepare_field_taxonomy_term_reference(&$result, $field_info, $f
  * Prepare field type "file"
  */
 function _parser_prepare_field_file(&$result, $field_info, $field_instance, $entity, $job, $page_url, &$stat) {
+  if (!$result['file']) {
+    $result = NULL;
+    return;
+  }
   if (is_numeric($result['file'])) {
     return;
   }
@@ -83,14 +87,14 @@ function _parser_prepare_field_file(&$result, $field_info, $field_instance, $ent
   if ($allowed_file_extensions && !in_array($file_ext, $allowed_file_extensions)) {
     watchdog('parser', 'Файл <i>' . check_plain($file_url) . '</i> закачан не будет, так как его тип не в списке допустимых.');
     $result = NULL;
-    return NULL;
+    return;
   }
   
   // Download file to cache
   $cache_uri = _parser_download_url_to_cache($file_url, $stat);
   if (!$cache_uri) {
     $result = NULL;
-    return NULL;
+    return;
   }
   
   // Copy file from cache to $dest_dir

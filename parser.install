@@ -200,7 +200,8 @@ function parser_schema() {
  * Implementation of hook_install().
  */
 function parser_install() {
-  file_prepare_directory($directory = 'public://parser_cache', FILE_CREATE_DIRECTORY);
+  $cache_dir = 'public://parser_cache';
+  file_prepare_directory($cache_dir, FILE_CREATE_DIRECTORY);
   
   $job = array(
     'title' => 'Парсинг шаблонов с drupal.org',

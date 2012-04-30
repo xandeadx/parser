@@ -8,7 +8,7 @@ function _parser_prepare_field_text(&$result, $field_info, $field_instance, $ent
   if (!empty($field_info['settings']['max_length']) && drupal_strlen($result) > $field_info['settings']['max_length']) {
     $original_result = $result;
     $result = drupal_substr($result, 0, $field_info['settings']['max_length']);
-    _parser_watchdog_error('Обрезан текст в поле "' . $field_info['field_name'] . '": "<i>' . check_plain($original_result) . '</i>" => "<i>' . check_plain($result) . '</i>".');
+    _parser_watchdog('Обрезан текст в поле "' . $field_info['field_name'] . '": "<i>' . check_plain($original_result) . '</i>" => "<i>' . check_plain($result) . '</i>".');
   }
 }
 

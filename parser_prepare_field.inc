@@ -8,7 +8,7 @@ function _parser_prepare_field_text(&$result, $field_info, $field_instance, $ent
   if (!empty($field_info['settings']['max_length']) && drupal_strlen($result) > $field_info['settings']['max_length']) {
     $original_result = $result;
     $result = drupal_substr($result, 0, $field_info['settings']['max_length']);
-    watchdog('parser', 'Обрезан текст в поле "' . $field_info['field_name'] . '": "<i>' . check_plain($original_result) . '</i>" => "<i>' . check_plain($result) . '</i>".');
+    _parser_watchdog_error('Обрезан текст в поле "' . $field_info['field_name'] . '": "<i>' . check_plain($original_result) . '</i>" => "<i>' . check_plain($result) . '</i>".');
   }
 }
 
@@ -85,7 +85,7 @@ function _parser_prepare_field_file(&$result, $field_info, $field_instance, $ent
   // Validate by extensions
   $allowed_file_extensions = explode(' ', $field_instance['settings']['file_extensions']);
   if ($allowed_file_extensions && !in_array($file_ext, $allowed_file_extensions)) {
-    watchdog('parser', 'Файл <i>' . check_plain($file_url) . '</i> закачан не будет, так как его тип не в списке допустимых.');
+    _parser_watchdog('Файл <i>' . check_plain($file_url) . '</i> закачан не будет, так как его тип не в списке допустимых.');
     $result = NULL;
     return;
   }

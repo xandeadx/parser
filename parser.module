@@ -632,7 +632,7 @@ function parser_parse($job, &$context) {
       $entity_wrapper->save();
     }
     catch (Exception $e) {
-      watchdog('parser', 'Ошибка при сохранении сущности: ' . $e->getMessage() . '. <b>Адрес:</b> ' . check_plain($page_url) . ' <pre>' . check_plain(print_r($entity, TRUE)) . '</pre>', array(), WATCHDOG_ERROR);
+      _parser_watchdog('Ошибка при сохранении сущности: ' . $e->getMessage() . '. <b>Адрес:</b> ' . check_plain($page_url), $entity);
     }
     
     if ($entity_id = $entity_wrapper->getIdentifier()) {
@@ -1020,14 +1020,14 @@ function _parser_download_url_to_cache($url, &$stat = NULL) {
     }
     
     if (!empty($result->error)) {
-      watchdog('parser', 'Ошибка при закачке ' . check_plain($url) . ': ' . check_plain($result->error) . (isset($result->data) ? ', <b>Результат</b>: ' . check_plain(drupal_substr($result->data, 0, 1000)) : ''));
+      _parser_watchdog('Ошибка при закачке ' . check_plain($url) . ': ' . check_plain($result->error) . (isset($result->data) ? ', <b>Результат</b>: ' . check_plain(drupal_substr($result->data, 0, 1000)) : ''));
       if ($stat) {
         $stat['files_from_http_error']++;
       }
       return NULL;
     }
     if (!$result->data) {
-      watchdog('parser', 'Ошибка при закачке ' . check_plain($url) . ': сервер не возвратил данных.');
+      _parser_watchdog('Ошибка при закачке ' . check_plain($url) . ': сервер не возвратил данных.');
       if ($stat) {
         $stat['files_from_http_error']++;
       }
@@ -1174,7 +1174,7 @@ function _parser_set_property($entity_wrapper, $property_name, $property_value, 
           $entity_wrapper->{$property_name}[$delta]->{$sub_property_name} = $sub_property_value;
         }
         catch (Exception $e) {
-          watchdog('parser', 'Ошибка при записи в $entity_wrapper->' . $property_name . '[' . $delta . ']->' . $sub_property_name . ': ' . $e->getMessage() . '<pre>' . check_plain(print_r($sub_property_value, TRUE)) . '</pre>', array(), WATCHDOG_ERROR);
+          _parser_watchdog('Ошибка при записи в $entity_wrapper->' . $property_name . '[' . $delta . ']->' . $sub_property_name . ': ' . $e->getMessage(), $sub_property_value);
         }
       }
     }
@@ -1186,7 +1186,7 @@ function _parser_set_property($entity_wrapper, $property_name, $property_value, 
         $entity_wrapper->{$property_name}->{$sub_property_name} = $sub_property_value;
       }
       catch (Exception $e) {
-        watchdog('parser', 'Ошибка при записи в $entity_wrapper->' . $property_name . '->' . $sub_property_name . ': ' . $e->getMessage() . '<pre>' . check_plain(print_r($sub_property_value, TRUE)) . '</pre>', array(), WATCHDOG_ERROR);
+        _parser_watchdog('Ошибка при записи в $entity_wrapper->' . $property_name . '->' . $sub_property_name . ': ' . $e->getMessage(), $sub_property_value);
       }
     }
   }
@@ -1197,7 +1197,7 @@ function _parser_set_property($entity_wrapper, $property_name, $property_value, 
         $entity_wrapper->{$property_name}[$delta] = $property_item;
       }
       catch (Exception $e) {
-        watchdog('parser', 'Ошибка при записи в $entity_wrapper->' . $property_name . '[' . $delta . ']: ' . $e->getMessage() . '<pre>' . check_plain(print_r($property_item, TRUE)) . '</pre>', array(), WATCHDOG_ERROR);
+        _parser_watchdog('Ошибка при записи в $entity_wrapper->' . $property_name . '[' . $delta . ']: ' . $e->getMessage(), $property_item);
       }
     }
   }
@@ -1207,9 +1207,16 @@ function _parser_set_property($entity_wrapper, $property_name, $property_value, 
       $entity_wrapper->{$property_name} = $property_value;
     }
     catch (Exception $e) {
-      watchdog('parser', 'Ошибка при записи в $entity_wrapper->' . $property_name . ': ' . $e->getMessage() . '<pre>' . check_plain(print_r($property_value, TRUE)) . '</pre>', array(), WATCHDOG_ERROR);
+      _parser_watchdog('Ошибка при записи в $entity_wrapper->' . $property_name . ': ' . $e->getMessage(), $property_value);
     }
   }
+}
+
+/**
+ * Add error to watchdog
+ */
+function _parser_watchdog($text, $object) {
+  watchdog('parser', $text . '<br />Value:<pre>' . check_plain(print_r($object, TRUE)) . '</pre>', array(), WATCHDOG_ERROR);
 }
 
 /**
@@ -1237,7 +1244,7 @@ function _parser_copy_file($from_uri, $to_uri) {
   $file_path = file_stream_wrapper_uri_normalize($to_uri);
   $file = file_copy($file, $file_path);
   if (!$file) {
-    watchdog('parser', 'Ошибка при копировании файла <i>' . $file->uri  . '</i> в <i>' . $file_path . '</i>.');
+    _parser_watchdog('Ошибка при копировании файла <i>' . $file->uri  . '</i> в <i>' . $file_path . '</i>.');
   }
   
   return $file;

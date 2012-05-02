@@ -16,7 +16,11 @@ function _parser_prepare_field_text(&$result, $field_info, $field_instance, $ent
  * Prepare field type "text_with_summary"
  */
 function _parser_prepare_field_text_with_summary(&$result, $field_info, $field_instance, $entity, $job, $page_url, &$context_results) {
-  if ($result && !is_array($result)) {
+  if (!$result) {
+    $result = NULL;
+    return;
+  }
+  if (is_string($result)) {
     $result = array('value' => $result);
   }
   if (!empty($result['value'])) {
@@ -51,6 +55,13 @@ function _parser_prepare_field_taxonomy_term_reference(&$result, $field_info, $f
  * Prepare field type "file"
  */
 function _parser_prepare_field_file(&$result, $field_info, $field_instance, $entity, $job, $page_url, &$stat) {
+  if (!$result) {
+    $result = NULL;
+    return;
+  }
+  if (is_string($result)) {
+    $result = array('file' => $result);
+  }
   if (!$result['file']) {
     $result = NULL;
     return;

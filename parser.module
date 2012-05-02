@@ -445,10 +445,12 @@ function parser_job_form_submit(&$form, &$form_state) {
   $job = entity_ui_form_submit_build_entity($form, $form_state);
   $job->save();
   
+  // Save
   if ($form_state['clicked_button']['#value'] == $form_state['values']['submit']) {
     drupal_set_message('Задание сохранено.');
     $form_state['redirect'] = 'admin/structure/parser_jobs/manage/' . $job->jid;
   }
+  // Save and Run
   else {
     _parser_url_delete_all();
     _parser_url_add($job->start_url);
@@ -686,6 +688,7 @@ function parser_finished($success, $results, $operations) {
     Затрачено времени: ' . gmdate('H:i:s', time() - $results['time_start']) . '.
     ' . l('Посмотреть системный журнал', 'admin/reports/dblog') . '
   ');
+  drupal_goto('admin/structure/parser_jobs/manage/' . $results['jid']);
 }
 
 /**

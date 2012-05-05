@@ -23,12 +23,3 @@ input.check-button {
   min-height: 5em;
 }
 
-div.vertical-tabs .vertical-tabs-panes fieldset fieldset legend {
-  display: block;
-}
-
-div.vertical-tabs .vertical-tabs-panes fieldset fieldset .fieldset-wrapper {
-  border: 1px solid #CCCCCC;
-  padding-top: 30px;
-}
-

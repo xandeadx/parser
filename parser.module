@@ -452,24 +452,29 @@ function parser_job_form_submit(&$form, &$form_state) {
   }
   // Save and Run
   else {
-    _parser_url_delete_all();
-    _parser_url_add($job->start_url);
-  
-    if ($job->clear_watchdog) {
-      db_delete('watchdog')->execute();
-    }
-  
-    $batch = array(
-      'title' => 'Парсинг',
-      'progress_message' => '',
-      'operations' => array(
-        array('parser_parse', array($job)),
-      ),
-      'finished' => 'parser_finished',
-    );
-    
-    batch_set($batch);
+    parser_run_batch($job);
   }
+}
+
+/**
+ * Init batch process and run parsing
+ */
+function parser_run_batch($job) {
+  _parser_url_delete_all();
+  _parser_url_add($job->start_url);
+
+  if ($job->clear_watchdog) {
+    db_delete('watchdog')->execute();
+  }
+  
+  batch_set(array(
+    'title' => 'Парсинг',
+    'progress_message' => '',
+    'operations' => array(
+      array('parser_parse', array($job)),
+    ),
+    'finished' => 'parser_finished',
+  ));
 }
 
 /**

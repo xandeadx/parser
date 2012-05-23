@@ -229,7 +229,7 @@ function parser_install() {
       'title' => 'return $doc->find(\'h1#page-subtitle\')->text();',
       'body' => '' .
         '$content = $doc->find(\'.node-content\')->clone();' . "\n" .
-        '$content->find(\'.all-attached-images\')->remove();' . "\n" .
+        '$content->find(\'.field-type-filefield\')->remove();' . "\n" .
         'return array(' . "\n" .
         '  \'value\' => $content->html(),' . "\n" .
         '  \'format\' => \'full_html\',' . "\n" .
@@ -242,7 +242,7 @@ function parser_install() {
         'return $terms;',
       'field_image' => '' . 
         'return array(' . "\n" . 
-        '  \'file\' => $doc->find(\'.image-thumbnail\')->attr(\'src\'),' . "\n" .
+        '  \'file\' => $doc->find(\'.field-field-project-images a:first\')->attr(\'href\'),' . "\n" .
         ');',
       'author' => 'return 1;',
     ),

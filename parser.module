@@ -444,7 +444,7 @@ function parser_job_form_submit(&$form, &$form_state) {
   
   $job = entity_ui_form_submit_build_entity($form, $form_state);
   $job->save();
-  
+
   // Save
   if ($form_state['clicked_button']['#value'] == $form_state['values']['submit']) {
     drupal_set_message('Задание сохранено.');
@@ -452,26 +452,30 @@ function parser_job_form_submit(&$form, &$form_state) {
   }
   // Save and Run
   else {
-    parser_run_batch($job);
+    parser_run_batch($job, request_path() == 'admin/structure/parser_jobs/add');
   }
 }
 
 /**
  * Init batch process and run parsing
  */
-function parser_run_batch($job) {
+function parser_run_batch($job, $redirect = FALSE) {
+  if (is_numeric($job)) {
+    $job = parser_job_load($job);
+  }
+  
   _parser_url_delete_all();
   _parser_url_add($job->start_url);
 
-  if ($job->clear_watchdog) {
+  if (!empty($job->clear_watchdog)) {
     db_delete('watchdog')->execute();
   }
   
-  batch_set(array(
+  return batch_set(array(
     'title' => 'Парсинг',
     'progress_message' => '',
     'operations' => array(
-      array('parser_parse', array($job)),
+      array('parser_parse', array($job, $redirect)),
     ),
     'finished' => 'parser_finished',
   ));
@@ -480,7 +484,7 @@ function parser_run_batch($job) {
 /**
  * Parse page
  */
-function parser_parse($job, &$context) {
+function parser_parse($job, $redirect, &$context) {
   if (empty($context['sandbox'])) {
     $context['sandbox']['progress'] = 0;
     $context['sandbox']['entity_ids'] = array();
@@ -492,6 +496,7 @@ function parser_parse($job, &$context) {
     $context['results']['files_from_http'] = 0;
     $context['results']['files_from_http_error'] = 0;
     $context['results']['files_from_cache'] = 0;
+    $context['results']['redirect'] = $redirect;
   }
   
   $url = _parser_url_get_not_parsed();
@@ -684,7 +689,7 @@ function parser_parse($job, &$context) {
  */
 function parser_finished($success, $results, $operations) {
   drupal_set_message('
-    ' . ($success ? 'Парсинг закончен' : 'Парсинг закончился с ошибками') . '.
+    ' . ($success ? 'Парсинг завершён' : 'Парсинг завершён с ошибками') . '.
     Обработано страниц: ' . _parser_url_count(TRUE) . '.
     Скачано URL: ' . $results['files_from_http'] . '.
     Не удалось скачать URL: ' . $results['files_from_http_error'] . '.
@@ -693,7 +698,9 @@ function parser_finished($success, $results, $operations) {
     Затрачено времени: ' . gmdate('H:i:s', time() - $results['time_start']) . '.
     ' . l('Посмотреть системный журнал', 'admin/reports/dblog') . '
   ');
-  drupal_goto('admin/structure/parser_jobs/manage/' . $results['jid']);
+  if ($results['redirect']) {
+    drupal_goto('admin/structure/parser_jobs/manage/' . $results['jid']);
+  }
 }
 
 /**

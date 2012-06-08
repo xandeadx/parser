@@ -457,7 +457,7 @@ function parser_job_form_submit(&$form, &$form_state) {
 }
 
 /**
- * Init batch process and run parsing
+ * Init batch
  */
 function parser_run_batch($job, $redirect = FALSE) {
   if (is_numeric($job)) {
@@ -471,7 +471,7 @@ function parser_run_batch($job, $redirect = FALSE) {
     db_delete('watchdog')->execute();
   }
   
-  return batch_set(array(
+  batch_set(array(
     'title' => 'Парсинг',
     'progress_message' => '',
     'operations' => array(
@@ -871,8 +871,10 @@ function parser_entity_property_info_alter(&$info) {
       }
     }
     
-    foreach ($properties['properties'] as $property_name => $property_info) {
-      _parser_set_format_setter_callback($info[$entity_type]['properties'][$property_name]);
+    if (isset($properties['properties'])) {
+      foreach ($properties['properties'] as $property_name => $property_info) {
+        _parser_set_format_setter_callback($info[$entity_type]['properties'][$property_name]);
+      }
     }
   }
 }

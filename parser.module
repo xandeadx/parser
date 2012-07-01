@@ -644,7 +644,7 @@ function parser_parse($job, $redirect, &$context) {
       $entity_wrapper->save();
     }
     catch (Exception $e) {
-      _parser_watchdog('Ошибка при сохранении сущности: ' . $e->getMessage() . '. <b>Адрес:</b> ' . check_plain($page_url), $entity);
+      _parser_watchdog('Ошибка при сохранении сущности: ' . $e->getMessage() . '. <b>Адрес:</b> ' . check_plain($page_url), $entity, WATCHDOG_ERROR);
     }
     
     if ($entity_id = $entity_wrapper->getIdentifier()) {
@@ -1037,14 +1037,14 @@ function _parser_download_url_to_cache($url, &$stat = NULL) {
     }
     
     if (!empty($result->error)) {
-      _parser_watchdog('Ошибка при закачке ' . check_plain($url) . ': ' . check_plain($result->error) . (isset($result->data) ? ', <b>Результат</b>: ' . check_plain(drupal_substr($result->data, 0, 1000)) : ''));
+      _parser_watchdog('Ошибка при закачке ' . check_plain($url) . ': ' . check_plain($result->error) . (isset($result->data) ? ', <b>Результат</b>: ' . check_plain(drupal_substr($result->data, 0, 1000)) : ''), NULL, WATCHDOG_ERROR);
       if ($stat) {
         $stat['files_from_http_error']++;
       }
       return NULL;
     }
     if (!$result->data) {
-      _parser_watchdog('Ошибка при закачке ' . check_plain($url) . ': сервер не возвратил данных.');
+      _parser_watchdog('Ошибка при закачке ' . check_plain($url) . ': сервер не возвратил данных.', NULL, WATCHDOG_ERROR);
       if ($stat) {
         $stat['files_from_http_error']++;
       }
@@ -1191,7 +1191,7 @@ function _parser_set_property($entity_wrapper, $property_name, $property_value, 
           $entity_wrapper->{$property_name}[$delta]->{$sub_property_name} = $sub_property_value;
         }
         catch (Exception $e) {
-          _parser_watchdog('Ошибка при записи в $entity_wrapper->' . $property_name . '[' . $delta . ']->' . $sub_property_name . ': ' . $e->getMessage(), $sub_property_value);
+          _parser_watchdog('Ошибка при записи в $entity_wrapper->' . $property_name . '[' . $delta . ']->' . $sub_property_name . ': ' . $e->getMessage(), $sub_property_value, WATCHDOG_ERROR);
         }
       }
     }
@@ -1203,7 +1203,7 @@ function _parser_set_property($entity_wrapper, $property_name, $property_value, 
         $entity_wrapper->{$property_name}->{$sub_property_name} = $sub_property_value;
       }
       catch (Exception $e) {
-        _parser_watchdog('Ошибка при записи в $entity_wrapper->' . $property_name . '->' . $sub_property_name . ': ' . $e->getMessage(), $sub_property_value);
+        _parser_watchdog('Ошибка при записи в $entity_wrapper->' . $property_name . '->' . $sub_property_name . ': ' . $e->getMessage(), $sub_property_value, WATCHDOG_ERROR);
       }
     }
   }
@@ -1214,7 +1214,7 @@ function _parser_set_property($entity_wrapper, $property_name, $property_value, 
         $entity_wrapper->{$property_name}[$delta] = $property_item;
       }
       catch (Exception $e) {
-        _parser_watchdog('Ошибка при записи в $entity_wrapper->' . $property_name . '[' . $delta . ']: ' . $e->getMessage(), $property_item);
+        _parser_watchdog('Ошибка при записи в $entity_wrapper->' . $property_name . '[' . $delta . ']: ' . $e->getMessage(), $property_item, WATCHDOG_ERROR);
       }
     }
   }
@@ -1224,7 +1224,7 @@ function _parser_set_property($entity_wrapper, $property_name, $property_value, 
       $entity_wrapper->{$property_name} = $property_value;
     }
     catch (Exception $e) {
-      _parser_watchdog('Ошибка при записи в $entity_wrapper->' . $property_name . ': ' . $e->getMessage(), $property_value);
+      _parser_watchdog('Ошибка при записи в $entity_wrapper->' . $property_name . ': ' . $e->getMessage(), $property_value, WATCHDOG_ERROR);
     }
   }
 }
@@ -1232,8 +1232,13 @@ function _parser_set_property($entity_wrapper, $property_name, $property_value, 
 /**
  * Add error to watchdog
  */
-function _parser_watchdog($text, $object) {
-  watchdog('parser', $text . '<br />Value:<pre>' . check_plain(print_r($object, TRUE)) . '</pre>', array(), WATCHDOG_ERROR);
+function _parser_watchdog($text, $object = NULL, $severity = WATCHDOG_NOTICE) {
+  if (!is_null($object)) {
+    watchdog('parser', $text . '<br />Value:<pre>' . check_plain(print_r($object, TRUE)) . '</pre>', array(), $severity);
+  }
+  else {
+    watchdog('parser', $text, array(), $severity);
+  }
 }
 
 /**

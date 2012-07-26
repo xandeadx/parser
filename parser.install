@@ -147,7 +147,6 @@ function parser_schema() {
       ),
       'depth' => array(
         'type' => 'int',
-        'size' => 'tiny',
         'unsigned' => TRUE,
         'not null' => TRUE,
         'default' => 0,

@@ -71,7 +71,7 @@ function parser_job_uri($job) {
 }
 
 /**
- * Menu callback
+ * Job form
  */
 function parser_job_form($form, &$form_state, $job) {
   $check_button = array('#field_prefix' => '<input type="button" value="проверить" class="form-submit check-button" />');
@@ -304,6 +304,7 @@ function parser_job_form($form, &$form_state, $job) {
     $weight++;
   }
   
+  // Advanced settings
   $form['advanced_settings'] = array(
     '#type' => 'fieldset',
     '#title' => 'Дополнительные настройки',

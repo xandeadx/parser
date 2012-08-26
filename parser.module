@@ -505,9 +505,10 @@ function parser_parse($job, $redirect, &$context) {
   $page_url_parsed = parse_url($page_url);
   $page = _parser_get_page_by_url($page_url, $job->site_charset, $context['results']);
   $doc = _parser_create_phpquery($page, $job->charset_fix);
-  $entity_id = parser_get_entity_id_by_url($page_url, $job->jid);
+  $entity_id = parser_get_entity_id_by_url($page_url, $job->jid, $url->element);
   $entity_type_info = entity_get_info($job->entity_type);
   $page_key = '';
+  $elements = array($page);
   
   if ($url->depth < $job->depth) {
     // Find links
@@ -555,10 +556,24 @@ function parser_parse($job, $redirect, &$context) {
   }
   if ($allowed_parse && $job->check_code) {
     $allowed_parse = eval($job->check_code);
-    if ($allowed_parse && !is_bool($allowed_parse)) {
+    // If check code return page key
+    if (is_numeric($allowed_parse) || is_string($allowed_parse)) {
       $page_key = $allowed_parse;
       if (!$entity_id) {
         $entity_id = parser_get_entity_id_by_page_key($page_key, $job->jid);
+      }
+    }
+    // If check code return elements array
+    else if (is_array($allowed_parse)) {
+      $elements = $allowed_parse;
+      if ($url->element === NULL) {
+        foreach (array_keys($elements) as $element) {
+          _parser_url_add($url->url, $url->depth, $url->page_url, $url->href, $element);
+        }
+        $allowed_parse = FALSE;
+      }
+      else {
+        $doc_element = _parser_create_phpquery($elements[$url->element], $job->charset_fix);
       }
     }
   }
@@ -654,6 +669,7 @@ function parser_parse($job, $redirect, &$context) {
         'jid' => $job->jid,
         'url' => $page_url,
         'page_key' => $page_key,
+        'element' => $url->element,
       ));
       
       $context['sandbox']['entity_ids'][] = $entity_id;
@@ -661,7 +677,7 @@ function parser_parse($job, $redirect, &$context) {
     }
   }
   
-  _parser_url_mark_parsed($page_url);
+  _parser_url_mark_parsed($page_url, $url->element);
 
   $context['sandbox']['max'] = _parser_url_count();
   $context['sandbox']['progress']++;
@@ -740,10 +756,10 @@ function parser_entity_view($entity, $entity_type, $view_mode, $langcode) {
 }
 
 /**
- * Check php code
+ * Menu callback. Check php code.
  */
 function parser_check_code() {
-  $params = array('test_url', 'site_charset', 'charset_fix', 'field_name', 'field_value');
+  $params = array('test_url', 'check_code', 'site_charset', 'charset_fix', 'field_name', 'field_value');
   foreach ($params as $param) {
     if (!isset($_POST[$param]) || $_POST[$param] === '') {
       echo 'bad params';
@@ -754,6 +770,12 @@ function parser_check_code() {
   $page = _parser_get_page_by_url($_POST['test_url'], $_POST['site_charset']);
   $page_url = $_POST['test_url'];
   $doc = _parser_create_phpquery($page, $_POST['charset_fix']);
+  $check_result = eval($_POST['check_code']);
+  
+  if (is_array($check_result)) {
+    $doc_element = _parser_create_phpquery(current($check_result), $_POST['charset_fix']);
+  }
+  
   $result = eval($_POST['field_value']);
   
   echo print_r($result, TRUE);
@@ -830,7 +852,7 @@ function parser_library() {
 /**
  * Return entity id by URL
  */
-function parser_get_entity_id_by_url($url, $jid = NULL) {
+function parser_get_entity_id_by_url($url, $jid = NULL, $element = NULL) {
   $query = db_select('parser_map', 'pn')
     ->fields('pn', array('entity_id'))
     ->condition('url', $url)
@@ -838,6 +860,13 @@ function parser_get_entity_id_by_url($url, $jid = NULL) {
     
   if ($jid) {
     $query->condition('jid', $jid);
+  }
+  
+  if ($element === NULL) {
+    $query->isNull('element');
+  }
+  else {
+    $query->condition('element', $element);
   }
   
   return $query->execute()->fetchField();
@@ -932,12 +961,19 @@ function _parser_set_format_setter_callback(&$property_info) {
 /**
  * Get URL info
  */
-function _parser_url_get($url) {
-  return db_select('parser_urls', 'pu')
+function _parser_url_get($url, $element = NULL) {
+  $query = db_select('parser_urls', 'pu')
     ->fields('pu')
-    ->condition('url', $url)
-    ->execute()
-    ->fetchObject();
+    ->condition('url', $url);
+  
+  if ($element === NULL) {
+    $query->isNull('element');
+  }
+  else {
+    $query->condition('element', $element);
+  }
+  
+  return $query->execute()->fetchObject();
 }
 
 /**
@@ -955,14 +991,15 @@ function _parser_url_get_not_parsed() {
 /**
  * Adding URL to database
  */
-function _parser_url_add($url, $depth = 0, $page_url = '', $href = '') {
-  if (!_parser_url_get($url)) {
+function _parser_url_add($url, $depth = 0, $page_url = '', $href = '', $element = NULL) {
+  if (!_parser_url_get($url, $element)) {
     db_insert('parser_urls')
       ->fields(array(
         'url' => $url,
         'depth' => $depth,
         'page_url' => $page_url,
         'href' => $href,
+        'element' => $element,
       ))
       ->execute();
   }
@@ -971,11 +1008,19 @@ function _parser_url_add($url, $depth = 0, $page_url = '', $href = '') {
 /**
  * Mark URL as parsed
  */
-function _parser_url_mark_parsed($url) {
-  db_update('parser_urls')
+function _parser_url_mark_parsed($url, $element = NULL) {
+  $query = db_update('parser_urls')
     ->fields(array('parsed' => 1))
-    ->condition('url', $url)
-    ->execute();
+    ->condition('url', $url);
+  
+  if ($element === NULL) {
+    $query->isNull('element');
+  }
+  else {
+    $query->condition('element', $element);
+  }
+  
+  $query->execute();
 }
 
 /**
@@ -1075,6 +1120,7 @@ function _parser_map_save($record) {
     ->fields(array(
       'jid' => $record['jid'],
       'url' => $record['url'],
+      'element' => $record['element'],
       'page_key' => $record['page_key'],
     ))
     ->execute();

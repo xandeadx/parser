@@ -133,6 +133,10 @@ function parser_schema() {
         'not null' => TRUE,
         'default' => '',
       ),
+      'element' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+      ),
       'page_url' => array(
         'type' => 'varchar',
         'length' => 255,
@@ -180,6 +184,10 @@ function parser_schema() {
         'length' => 255,
         'not null' => TRUE,
         'default' => '',
+      ),
+      'element' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
       ),
       'page_key' => array(
         'type' => 'varchar',
@@ -268,3 +276,22 @@ function parser_update_7200() {
   ));
 }
 
+/**
+ * Add new col to {parser_urls}
+ */
+function parser_update_7201() {
+  db_add_field('parser_urls', 'element', array(
+    'type' => 'int',
+    'unsigned' => TRUE,
+  ));
+}
+
+/**
+ * Add new col to {parser_urls}
+ */
+function parser_update_7202() {
+  db_add_field('parser_map', 'element', array(
+    'type' => 'int',
+    'unsigned' => TRUE,
+  ));
+}

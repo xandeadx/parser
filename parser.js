@@ -8,6 +8,7 @@
         var $textarea = $(this).parent().next().find('textarea');
         var params = {
           test_url: $('#edit-test-url').val(),
+          check_code: $('#edit-check-code').val(),
           site_charset: $('#edit-site-charset').val(),
           charset_fix: $('#edit-charset-fix').attr('checked') ? 1 : 0,
           field_name: $textarea.attr('name'),

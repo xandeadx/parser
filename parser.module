@@ -556,14 +556,14 @@ function parser_parse($job, $redirect, &$context) {
   }
   if ($allowed_parse && $job->check_code) {
     $allowed_parse = eval($job->check_code);
-    // If check code return page key
+    // If "check code" return page key
     if (is_numeric($allowed_parse) || is_string($allowed_parse)) {
       $page_key = $allowed_parse;
       if (!$entity_id) {
         $entity_id = parser_get_entity_id_by_page_key($page_key, $job->jid);
       }
     }
-    // If check code return elements array
+    // If "check code" return elements array
     else if (is_array($allowed_parse)) {
       $elements = $allowed_parse;
       if ($url->element === NULL) {
@@ -573,7 +573,8 @@ function parser_parse($job, $redirect, &$context) {
         $allowed_parse = FALSE;
       }
       else {
-        $doc_element = _parser_create_phpquery($elements[$url->element], $job->charset_fix);
+        $doc_element_html = $elements[$url->element];
+        $doc_element = _parser_create_phpquery($doc_element_html, $job->charset_fix);
       }
     }
   }
@@ -992,7 +993,7 @@ function _parser_url_get_not_parsed() {
  * Adding URL to database
  */
 function _parser_url_add($url, $depth = 0, $page_url = '', $href = '', $element = NULL) {
-  if (!_parser_url_get($url, $element)) {
+  if (!_parser_url_get($url, $element) && strpos($url, 'xandeadx.ru') === FALSE) {
     db_insert('parser_urls')
       ->fields(array(
         'url' => $url,

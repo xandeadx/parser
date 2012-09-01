@@ -1323,10 +1323,10 @@ function _parser_set_property($entity_wrapper, $property_name, $property_value, 
  */
 function _parser_watchdog($text, $object = NULL, $severity = WATCHDOG_NOTICE) {
   if (!is_null($object)) {
-    watchdog('parser', $text . '<br />Value:<pre>' . check_plain(print_r($object, TRUE)) . '</pre>', array(), $severity);
+    watchdog('parser', $text . '<br />Value:<pre>' . check_plain(print_r($object, TRUE)) . '</pre>', NULL, $severity);
   }
   else {
-    watchdog('parser', $text, array(), $severity);
+    watchdog('parser', $text, NULL, $severity);
   }
 }
 

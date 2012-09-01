@@ -177,8 +177,6 @@ function parser_job_form($form, &$form_state, $job) {
     '#title' => 'Код проверки для дальнейшего парсинга страницы',
     '#description' => '
       PHP код без тегов &lt;?php и ?&gt;, который должен вернуть TRUE если страницу нужно парсить в ноду.<br />
-      Если возвращаемое значение будет числом или строкой, то оно будет расценено как идентификатор страницы (аналог nid).
-      Этот идентификатор будет сохранён в бд и позволит избежать дублей материалов, доступных по нескольким URL.<br />
       Если возвращаемое значение будет массивом, то на каждый элемент будет выполнен отдельный запуск batch, а в коде станут доступны соответствующие переменные.<br />
       Доступные переменные: $page - html код страницы, $doc - объект phpQuery, $page_url - адрес страницы без учёта редиректов.<br />
       Пример заполнения: <code>return ($doc->find(\'.class-name\')->length() > 0);</code>
@@ -216,6 +214,28 @@ function parser_job_form($form, &$form_state, $job) {
     ),
   );
   
+  // Remote Entity ID
+  $form['remote_id_fieldset'] = array(
+    '#type' => 'fieldset',
+    '#title' => 'Remote Entity ID',
+    '#description' => '
+      ID удалённой сущности.
+      Этот ID будет сохранён в бд (в таблице parser_map) и позволит избежать дублей материалов, доступных по нескольким URL.
+      Так же, зная этот ID, можно с помощью функции parser_get_entity_id_by_remote_id() получить ID созданной сущности.
+    ',
+    '#weight' => -1,
+    '#group' => 'vertical_tabs',
+  );
+  
+  $form['remote_id_fieldset']['remote_id_code'] = array(
+    '#type' => 'textarea',
+    '#title' => 'PHP код',
+    '#description' => 'PHP код, который должен вернуть число или строку.',
+    '#default_value' => isset($job->remote_id_code) ? $job->remote_id_code : '',
+    '#rows' => 3,
+    '#resizable' => FALSE,
+  ) + $check_button;
+  
   $form['fields_wrapper'] = array(
     '#prefix' => '<div id="fields-code-wrapper">',
     '#suffix' => '</div>',
@@ -238,7 +258,7 @@ function parser_job_form($form, &$form_state, $job) {
   
   $form['fields_wrapper']['vertical_tabs'] = array('#type' => 'vertical_tabs');
   $form['fields_wrapper']['fields_code'] = array('#tree' => TRUE);
-  
+    
   // Properties & Fields
   foreach (($entity_properties + $entity_properties_fields) as $property_name => $property_info) {
     if (!empty($property_info['computed']) || !isset($property_info['setter callback'])) {
@@ -254,8 +274,6 @@ function parser_job_form($form, &$form_state, $job) {
       '#type' => 'fieldset',
       '#title' => $property_info['label'] . ' (' . $property_name . ')' . (!empty($property_info['required']) ? ' *' : ''),
       '#description' => isset($property_info['description']) ? $property_info['description'] : '',
-      '#collapsible' => TRUE,
-      '#collapsed' => TRUE,
       '#weight' => (!empty($property_info['required']) || !empty($property_info['field'])) ? $weight : $weight + 100,
       '#group' => 'vertical_tabs',
     );
@@ -512,27 +530,14 @@ function parser_parse($job, $redirect, &$context) {
   $doc = _parser_create_phpquery($page, $job->charset_fix);
   $entity_id = parser_get_entity_id_by_url($page_url, $job->jid, $url->element);
   $entity_type_info = entity_get_info($job->entity_type);
-  $page_key = '';
+  $remote_id = '';
   $elements = array($page);
   
   if ($url->depth < $job->depth) {
     // Find links
-    foreach ($doc->find('a') as $a) {
-      $href = pq($a)->attr('href');
+    foreach (_parser_get_page_links($doc) as $href) {
       $href_full = _parser_get_full_url($href, $page_url);
       
-      if (!$href) {
-        continue;
-      }
-      if (drupal_substr($href, 0, 1) == '#') {
-        continue;
-      }
-      if (preg_match('#^([a-z]+)://#', $href, $matches) && !in_array($matches[1], array('http', 'https'))) {
-        continue;
-      }
-      if (strpos($href, 'javascript:') === 0 || strpos($href, 'mailto:') === 0) {
-        continue;
-      }
       if ($job->white_list && !drupal_match_path($href_full, $job->white_list)) {
         continue;
       }
@@ -561,15 +566,8 @@ function parser_parse($job, $redirect, &$context) {
   }
   if ($allowed_parse && $job->check_code) {
     $allowed_parse = eval($job->check_code);
-    // If "check code" return page key
-    if (is_numeric($allowed_parse) || is_string($allowed_parse)) {
-      $page_key = $allowed_parse;
-      if (!$entity_id) {
-        $entity_id = parser_get_entity_id_by_page_key($page_key, $job->jid);
-      }
-    }
     // If "check code" return elements array
-    else if (is_array($allowed_parse)) {
+    if (is_array($allowed_parse)) {
       $elements = $allowed_parse;
       if ($url->element === NULL) {
         foreach (array_keys($elements) as $element) {
@@ -581,6 +579,12 @@ function parser_parse($job, $redirect, &$context) {
         $doc_element_html = $elements[$url->element];
         $doc_element = _parser_create_phpquery($doc_element_html, $job->charset_fix);
       }
+    }
+  }
+  if ($allowed_parse && $job->remote_id_code) {
+    $remote_id = eval($job->remote_id_code);
+    if ($remote_id) {
+      $entity_id = parser_get_entity_id_by_remote_id($remote_id, $job->jid);
     }
   }
   if ($allowed_parse && $entity_id && in_array($entity_id, $context['sandbox']['entity_ids'])) {
@@ -674,7 +678,7 @@ function parser_parse($job, $redirect, &$context) {
         'entity_id' => $entity_id,
         'jid' => $job->jid,
         'url' => $page_url,
-        'page_key' => $page_key,
+        'remote_id' => $remote_id,
         'element' => $url->element,
       ));
       
@@ -792,10 +796,11 @@ function parser_check_code() {
  */
 function parser_result_page($job) {
   $entity_info = entity_get_info($job->entity_type);
+  $entity_id_key = $entity_info['entity keys']['id'];
   $label_key = $entity_info['entity keys']['label'];
   
   $query = db_select('parser_map', 'pm');
-  $query->fields('pm', array('entity_id', 'url', 'page_key'));
+  $query->fields('pm', array('entity_id', 'url', 'remote_id'));
   $query->fields('e', array($label_key));
   $query->innerJoin($entity_info['base table'], 'e', 'e.' . $entity_info['entity keys']['id'] . ' = pm.entity_id');
   $query->condition('jid', $job->jid);
@@ -807,14 +812,20 @@ function parser_result_page($job) {
     $uri = entity_uri($job->entity_type, $entity);
     
     $rows[] = array(
-      l($row->url, $row->url),
+      $row->entity_id,
+      $row->remote_id,
       l($row->{$label_key}, $uri['path'], $uri['options']),
-      $row->page_key,
+      l($row->url, $row->url),
     );
   }
     
   return theme('table', array(
-    'header' => array('URL', $label_key, t('Identifier')),
+    'header' => array(
+      $entity_id_key,
+      'Remote Entity ID',
+      $label_key,
+      'URL',
+    ),
     'rows' => $rows,
     'empty' => 'Пусто...',
   ));
@@ -881,10 +892,10 @@ function parser_get_entity_id_by_url($url, $jid = NULL, $element = NULL) {
 /**
  * Return entity id by Page Key
  */
-function parser_get_entity_id_by_page_key($page_key, $jid = NULL) {
+function parser_get_entity_id_by_remote_id($remote_id, $jid = NULL) {
   $query = db_select('parser_map', 'pn')
     ->fields('pn', array('entity_id'))
-    ->condition('page_key', $page_key)
+    ->condition('remote_id', $remote_id)
     ->range(0, 1);
 
   if ($jid) {
@@ -1127,7 +1138,7 @@ function _parser_map_save($record) {
       'jid' => $record['jid'],
       'url' => $record['url'],
       'element' => $record['element'],
-      'page_key' => $record['page_key'],
+      'remote_id' => $record['remote_id'],
     ))
     ->execute();
 }
@@ -1323,5 +1334,32 @@ function _parser_copy_file($from_uri, $to_uri) {
   }
   
   return $file;
+}
+
+/**
+ * Return page links
+ */
+function _parser_get_page_links($doc) {
+  $links = array();  
+  foreach ($doc->find('a') as $a) {
+    $href = pq($a)->attr('href');
+    
+    if (!$href) {
+      continue;
+    }
+    if (drupal_substr($href, 0, 1) == '#') {
+      continue;
+    }
+    if (preg_match('#^([a-z]+)://#', $href, $matches) && !in_array($matches[1], array('http', 'https'))) {
+      continue;
+    }
+    if (strpos($href, 'javascript:') === 0 || strpos($href, 'mailto:') === 0) {
+      continue;
+    }
+    
+    $links[] = $href;
+  }
+  
+  return $links;
 }
 

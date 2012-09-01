@@ -99,6 +99,10 @@ function parser_schema() {
         'not null' => TRUE,
         'default' => '',
       ),
+      'remote_id_code' => array(
+        'type' => 'text',
+        'not null' => TRUE,
+      ),
       'fields_code' => array(
         'type' => 'text',
         'not null' => TRUE,
@@ -179,6 +183,12 @@ function parser_schema() {
         'not null' => TRUE,
         'default' => 0,
       ),
+      'remote_id' => array(
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
       'url' => array(
         'type' => 'varchar',
         'length' => 255,
@@ -188,12 +198,6 @@ function parser_schema() {
       'element' => array(
         'type' => 'int',
         'unsigned' => TRUE,
-      ),
-      'page_key' => array(
-        'type' => 'varchar',
-        'length' => 255,
-        'not null' => TRUE,
-        'default' => '',
       ),
     ),
     'primary key' => array('jid', 'entity_id'),
@@ -231,6 +235,9 @@ function parser_install() {
     'bundle' => 'article',
     'save_url' => 0,
     'no_update' => 0,
+    'remote_id_code' => '' .
+      '$id = $doc->find(\'.node\')->attr(\'id\');' . "\n" .
+      'return end(explode(\'-\', $id));',
     'fields_code' => array(
       'title' => 'return $doc->find(\'h1#page-subtitle\')->text();',
       'body' => '' .
@@ -287,11 +294,33 @@ function parser_update_7201() {
 }
 
 /**
- * Add new col to {parser_urls}
+ * Add new col to {parser_map}
  */
 function parser_update_7202() {
   db_add_field('parser_map', 'element', array(
     'type' => 'int',
     'unsigned' => TRUE,
+  ));
+}
+
+/**
+ * Add new col to {parser_jobs}
+ */
+function parser_update_7203() {
+  db_add_field('parser_jobs', 'remote_id_code', array(
+    'type' => 'text',
+  ));
+  drupal_flush_all_caches();
+}
+
+/**
+ * Rename {parser_map}.page_key to {parser_map}.remote_id
+ */
+function parser_update_7204() {
+  db_change_field('parser_map', 'page_key', 'remote_id', array(
+    'type' => 'varchar',
+    'length' => 255,
+    'not null' => TRUE,
+    'default' => '',
   ));
 }

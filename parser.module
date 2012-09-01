@@ -77,25 +77,17 @@ function parser_job_form($form, &$form_state, $job) {
   $check_button = array('#field_prefix' => '<input type="button" value="проверить" class="form-submit check-button" />');
   $fields_code = isset($job->fields_code) ? $job->fields_code : array();
   $entity_types = entity_get_info();
+  $entity_type_options = _parser_get_entity_type_options($entity_types);
   $fields_info = field_info_fields();
   $formats = filter_formats();
   $weight = 0;
-  
-  $entity_type_options = array();
-  foreach ($entity_types as $entity_type => $entity_info) {
-    $entity_type_options[$entity_type] = $entity_info['label'];
-  }
   
   $entity_type_value = isset($job->entity_type) ? $job->entity_type : 'node';
   if (isset($form_state['values']['entity_type'])) {
     $entity_type_value = $form_state['values']['entity_type'];
   }
   
-  $bundle_options = array();
-  foreach ($entity_types[$entity_type_value]['bundles'] as $bundle_name => $bundle_info) {
-    $bundle_options[$bundle_name] = $bundle_info['label'];
-  }
-  
+  $bundle_options = _parser_get_bundle_options($entity_types[$entity_type_value]['bundles']);
   $bundle_value = (isset($job->bundle) && isset($bundle_options[$job->bundle])) ? $job->bundle : key($bundle_options);
   if (isset($form_state['values']['bundle']) && isset($bundle_options[$form_state['values']['bundle']])) {
     $bundle_value = $form_state['values']['bundle'];
@@ -114,11 +106,6 @@ function parser_job_form($form, &$form_state, $job) {
   }
   
   $fields_instances = field_info_instances($entity_type_value, $bundle_value);
-  
-  $format_options = array();
-  foreach ($formats as $format) {
-    $format_options[$format->format] = $format->name;
-  }
   
   $form['title'] = array(
     '#type' => 'textfield',
@@ -337,6 +324,37 @@ function parser_job_form($form, &$form_state, $job) {
   }
   
   // Advanced settings
+  $form += _parser_job_form_advanced_settings($job, $check_button);
+  
+  $form['actions'] = array(
+    '#type' => 'actions',
+  );
+  
+  $form['actions']['submit'] = array(
+    '#type' => 'submit',
+    '#value' => 'Сохранить задание',
+  );
+  
+  $form['actions']['submit_and_start'] = array(
+    '#type' => 'submit',
+    '#value' => 'Сохранить задание и Начать парсинг',
+  );
+  
+  _parser_set_rows($form);
+  
+  $parser_path = drupal_get_path('module', 'parser');
+  $form['#attached']['library'][] = array('system', 'ui.dialog');
+  $form['#attached']['library'][] = array('parser', 'codemirror');
+  $form['#attached']['css'][] = $parser_path . '/parser.css';
+  $form['#attached']['js'][] = $parser_path . '/parser.js';
+
+  return $form;
+}
+
+/**
+ * Advanced settings sub-form
+ */
+function _parser_job_form_advanced_settings($job, $check_button) {
   $form['advanced_settings'] = array(
     '#type' => 'fieldset',
     '#title' => 'Дополнительные настройки',
@@ -444,28 +462,6 @@ function parser_job_form($form, &$form_state, $job) {
     '#resizable' => FALSE,
   );
   
-  $form['actions'] = array(
-    '#type' => 'actions',
-  );
-  
-  $form['actions']['submit'] = array(
-    '#type' => 'submit',
-    '#value' => 'Сохранить задание',
-  );
-  
-  $form['actions']['submit_and_start'] = array(
-    '#type' => 'submit',
-    '#value' => 'Сохранить задание и Начать парсинг',
-  );
-  
-  _parser_set_rows($form);
-  
-  $parser_path = drupal_get_path('module', 'parser');
-  $form['#attached']['library'][] = array('system', 'ui.dialog');
-  $form['#attached']['library'][] = array('parser', 'codemirror');
-  $form['#attached']['css'][] = $parser_path . '/parser.css';
-  $form['#attached']['js'][] = $parser_path . '/parser.js';
-
   return $form;
 }
 
@@ -809,7 +805,7 @@ function parser_entity_view($entity, $entity_type, $view_mode, $langcode) {
 function parser_check_code() {
   $params = array('test_url', 'site_charset', 'charset_fix', 'field_name', 'field_value', 'list_mode_code');
   foreach ($params as $param) {
-    if (!isset($_POST[$param]) || $_POST[$param] === '') {
+    if (!isset($_POST[$param])) {
       echo 'bad params';
       return NULL;
     }
@@ -1399,3 +1395,24 @@ function _parser_check_urls_host($url1, $url2) {
   }
 }
 
+/**
+ * Return options for form element
+ */
+function _parser_get_entity_type_options($entity_types) {
+  $entity_type_options = array();
+  foreach ($entity_types as $entity_type => $entity_info) {
+    $entity_type_options[$entity_type] = $entity_info['label'];
+  }
+  return $entity_type_options;
+}
+
+/**
+ * Return options for form element
+ */
+function _parser_get_bundle_options($bundles) {
+  $bundle_options = array();
+  foreach ($bundles as $bundle_name => $bundle_info) {
+    $bundle_options[$bundle_name] = $bundle_info['label'];
+  }
+  return $bundle_options;
+}

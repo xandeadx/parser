@@ -108,6 +108,10 @@ function parser_schema() {
         'not null' => TRUE,
         'serialize' => TRUE,
       ),
+      'list_mode_code' => array(
+        'type' => 'text',
+        'not null' => TRUE,
+      ),
       'prepare_code' => array(
         'type' => 'text',
         'not null' => TRUE,
@@ -136,10 +140,6 @@ function parser_schema() {
         'length' => 255,
         'not null' => TRUE,
         'default' => '',
-      ),
-      'element' => array(
-        'type' => 'int',
-        'unsigned' => TRUE,
       ),
       'page_url' => array(
         'type' => 'varchar',
@@ -324,3 +324,21 @@ function parser_update_7204() {
     'default' => '',
   ));
 }
+
+/**
+ * Add new col to {parser_jobs}
+ */
+function parser_update_7205() {
+  db_add_field('parser_jobs', 'list_mode_code', array(
+    'type' => 'text',
+  ));
+  drupal_flush_all_caches();
+}
+
+/**
+ * Remove col from {parser_urls}
+ */
+function parser_update_7206() {
+  db_drop_field('parser_urls', 'element');
+}
+

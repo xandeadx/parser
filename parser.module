@@ -150,7 +150,11 @@ function parser_job_form($form, &$form_state, $job) {
   $form['depth'] = array(
     '#type' => 'textfield',
     '#title' => 'Глубина',
-    '#description' => 'Глубина, на которую парсер будет ходить по ссылкам. Например 1 означает, что будет распарсен стартовый адрес и страницы на которые он ссылается, т.е. парсер пройдёт вглубь на 1 уровень относительно стартовой страницы.',
+    '#description' => '
+      Глубина, на которую парсер будет ходить по ссылкам. Например 1 означает, что будет распарсен стартовый адрес и
+      страницы на которые он ссылается, т.е. парсер пройдёт вглубь на 1 уровень относительно стартовой страницы.
+      Укажите 0, если хотите распарсить только стартовый URL.
+    ',
     '#required' => TRUE,
     '#default_value' => isset($job->depth) ? $job->depth : '',
     '#size' => 5,
@@ -159,7 +163,10 @@ function parser_job_form($form, &$form_state, $job) {
   $form['white_list'] = array(
     '#type' => 'textarea',
     '#title' => 'Белый список адресов',
-    '#description' => 'Маски адресов, по которым будет разрешено ходить парсеру. Каждая маска на новой строке. Оставьте пустым, если парсеру разрешено ходить по всем найденным ссылкам. Пример заполнения: <code>http://drupal.org/project/*</code>',
+    '#description' => '
+      Маски адресов, по которым будет разрешено ходить парсеру. Каждая маска на новой строке. Оставьте пустым, если
+      парсеру разрешено ходить по всем найденным ссылкам. Пример заполнения: <code>http://drupal.org/project/*</code>
+    ',
     '#default_value' => isset($job->white_list) ? $job->white_list : '',
     '#rows' => 3,
   );
@@ -167,7 +174,10 @@ function parser_job_form($form, &$form_state, $job) {
   $form['black_list'] = array(
     '#type' => 'textarea',
     '#title' => 'Чёрный список адресов',
-    '#description' => 'Маски адресов, по которым будет запрещено ходить парсеру. Каждая маска на новой строке. Пример заполнения: <code>http://drupal.org/project/uc_*</code>',
+    '#description' => '
+      Маски адресов, по которым будет запрещено ходить парсеру. Каждая маска на новой строке. Пример заполнения:
+      <code>http://drupal.org/project/uc_*</code>
+    ',
     '#default_value' => isset($job->black_list) ? $job->black_list : '',
     '#rows' => 3,
   );
@@ -176,9 +186,8 @@ function parser_job_form($form, &$form_state, $job) {
     '#type' => 'textarea',
     '#title' => 'Код проверки для дальнейшего парсинга страницы',
     '#description' => '
-      PHP код без тегов &lt;?php и ?&gt;, который должен вернуть TRUE если страницу нужно парсить в ноду.<br />
-      Если возвращаемое значение будет массивом, то на каждый элемент будет выполнен отдельный запуск batch, а в коде станут доступны соответствующие переменные.<br />
-      Доступные переменные: $page - html код страницы, $doc - объект phpQuery, $page_url - адрес страницы без учёта редиректов.<br />
+      PHP код без тегов &lt;?php и ?&gt;, который должен вернуть TRUE если страницу нужно парсить в ноду.
+      Доступные переменные: $page - html код страницы, $doc - объект phpQuery, $page_url - адрес страницы без учёта редиректов.
       Пример заполнения: <code>return ($doc->find(\'.class-name\')->length() > 0);</code>
     ',
     '#default_value' => isset($job->check_code) ? $job->check_code : '',
@@ -244,13 +253,13 @@ function parser_job_form($form, &$form_state, $job) {
     '#description' => '
       <p>Поля заполняются без обёртки кода в &lt;?php и ?&gt;. Во всех полях доступны следующие переменные:</p>
       <p>
-        $doc - объект phpQuery<br />
+        $doc - объект phpQuery для страницы<br />
         $page - html код страницы<br />
         $page_url - адрес страницы без учёта редиректов<br />
         $entity - объект сущности<br />
         $entity_wrapper - entity metadata wrapper<br />
-        $doc_element - объект phpQuery для элемента<br />
-        $doc_element_html - html код элемента<br />
+        $doc_element - объект phpQuery для элемента (только если включён режим списка)<br />
+        $element_html - html код элемента (только если включён режим списка)<br />
       </p>
       <p>Оставьте textarea пустым, если поле заполнять не нужно.</p>
     ',
@@ -387,6 +396,37 @@ function parser_job_form($form, &$form_state, $job) {
     '#default_value' => 0,
   );
   
+  $form['advanced_settings']['list_mode'] = array(
+    '#type' => 'checkbox',
+    '#title' => 'Режим списка',
+    '#description' => 'Отметьте, если сущности на сайте источнике не имеют своих страниц, а располагаются в виде списков. Например это могут быть комментарии.',
+    '#default_value' => !empty($job->list_mode_code),
+  );
+  
+  $form['advanced_settings']['list_mode_code'] = array(
+    '#type' => 'textarea',
+    '#title' => 'Элементы списка',
+    '#description' => '
+      Код, который должен вернуть массив с элементами списка. Доступные переменные: $page - html код страницы, $doc - объект phpQuery.
+      Пример заполнения:<br />
+      <code>
+      $elements = array();<br />
+      foreach ($doc->find(\'#comments .comment\') as $element) {<br />
+      &nbsp;&nbsp;$elements[] = pq($element)->html();<br />
+      }<br />
+      return $elements;
+      </code>
+    ',
+    '#default_value' => isset($job->list_mode_code) ? $job->list_mode_code : '',
+    '#rows' => 3,
+    '#resizable' => FALSE,
+    '#states' => array(
+      'visible' => array(
+        'input[name="list_mode"]' => array('checked' => TRUE),
+      ),
+    ),
+  ) + $check_button;
+  
   $form['advanced_settings']['prepare_code'] = array(
     '#type' => 'textarea',
     '#title' => 'Пост-обработка сущности',
@@ -513,6 +553,8 @@ function parser_parse($job, $redirect, &$context) {
     $context['sandbox']['progress'] = 0;
     $context['sandbox']['entity_ids'] = array();
     $context['sandbox']['created_entities'] = 0;
+    $context['sandbox']['element'] = NULL;
+    
     $context['results']['jid'] = $job->jid;
     $context['results']['time_start'] = time();
     $context['results']['created_entities'] = 0;
@@ -528,10 +570,20 @@ function parser_parse($job, $redirect, &$context) {
   $page_url_parsed = parse_url($page_url);
   $page = _parser_get_page_by_url($page_url, $job->site_charset, $context['results']);
   $doc = _parser_create_phpquery($page, $job->charset_fix);
-  $entity_id = parser_get_entity_id_by_url($page_url, $job->jid, $url->element);
+  
+  $elements = NULL;
+  if ($job->list_mode_code) {
+    $elements = eval($job->list_mode_code);
+    if ($elements) {
+      $context['sandbox']['element'] = ($context['sandbox']['element'] === NULL) ? 0 : $context['sandbox']['element'] + 1;
+      $element_html = $elements[$context['sandbox']['element']];
+      $doc_element = _parser_create_phpquery($element_html, $job->charset_fix);
+    }
+  }
+  
+  $entity_id = parser_get_entity_id_by_url($page_url, $job->jid, $context['sandbox']['element']);
   $entity_type_info = entity_get_info($job->entity_type);
   $remote_id = '';
-  $elements = array($page);
   
   if ($url->depth < $job->depth) {
     // Find links
@@ -562,20 +614,6 @@ function parser_parse($job, $redirect, &$context) {
   }
   if ($allowed_parse && $job->check_code) {
     $allowed_parse = eval($job->check_code);
-    // If "check code" return elements array
-    if (is_array($allowed_parse)) {
-      $elements = $allowed_parse;
-      if ($url->element === NULL) {
-        foreach (array_keys($elements) as $element) {
-          _parser_url_add($url->url, $url->depth, $url->page_url, $url->href, $element);
-        }
-        $allowed_parse = FALSE;
-      }
-      else {
-        $doc_element_html = $elements[$url->element];
-        $doc_element = _parser_create_phpquery($doc_element_html, $job->charset_fix);
-      }
-    }
   }
   if ($allowed_parse && $job->remote_id_code) {
     $remote_id = eval($job->remote_id_code);
@@ -662,6 +700,7 @@ function parser_parse($job, $redirect, &$context) {
       eval($job->prepare_code);
     }
     
+    // Save entity
     try {
       $entity_wrapper->save();
     }
@@ -675,7 +714,7 @@ function parser_parse($job, $redirect, &$context) {
         'jid' => $job->jid,
         'url' => $page_url,
         'remote_id' => $remote_id,
-        'element' => $url->element,
+        'element' => $context['sandbox']['element'],
       ));
       
       $context['sandbox']['entity_ids'][] = $entity_id;
@@ -683,10 +722,12 @@ function parser_parse($job, $redirect, &$context) {
     }
   }
   
-  _parser_url_mark_parsed($page_url, $url->element);
+  if (!$elements || $context['sandbox']['element'] >= count($elements) - 1) {
+    _parser_url_mark_parsed($page_url, $context['sandbox']['element']);
+    $context['sandbox']['progress']++;
+  }
 
   $context['sandbox']['max'] = _parser_url_count();
-  $context['sandbox']['progress']++;
   $context['message'] = '
     Завершён парсинг страницы глубиной ' . $url->depth . ' <em>' . $page_url . '</em><br />
     Обработано страниц: ' . $context['sandbox']['progress'] . '<br />
@@ -765,7 +806,7 @@ function parser_entity_view($entity, $entity_type, $view_mode, $langcode) {
  * Menu callback. Check php code.
  */
 function parser_check_code() {
-  $params = array('test_url', 'check_code', 'site_charset', 'charset_fix', 'field_name', 'field_value');
+  $params = array('test_url', 'site_charset', 'charset_fix', 'field_name', 'field_value', 'list_mode_code');
   foreach ($params as $param) {
     if (!isset($_POST[$param]) || $_POST[$param] === '') {
       echo 'bad params';
@@ -776,10 +817,10 @@ function parser_check_code() {
   $page = _parser_get_page_by_url($_POST['test_url'], $_POST['site_charset']);
   $page_url = $_POST['test_url'];
   $doc = _parser_create_phpquery($page, $_POST['charset_fix']);
-  $check_result = eval($_POST['check_code']);
   
-  if (is_array($check_result)) {
-    $doc_element = _parser_create_phpquery(current($check_result), $_POST['charset_fix']);
+  if ($_POST['list_mode_code']) {
+    $elements = eval($_POST['list_mode_code']);
+    $doc_element = _parser_create_phpquery(current($elements), $_POST['charset_fix']);
   }
   
   $result = eval($_POST['field_value']);
@@ -974,19 +1015,12 @@ function _parser_set_format_setter_callback(&$property_info) {
 /**
  * Get URL info
  */
-function _parser_url_get($url, $element = NULL) {
-  $query = db_select('parser_urls', 'pu')
+function _parser_url_get($url) {
+  return db_select('parser_urls', 'pu')
     ->fields('pu')
-    ->condition('url', $url);
-  
-  if ($element === NULL) {
-    $query->isNull('element');
-  }
-  else {
-    $query->condition('element', $element);
-  }
-  
-  return $query->execute()->fetchObject();
+    ->condition('url', $url)
+    ->execute()
+    ->fetchObject();
 }
 
 /**
@@ -1004,15 +1038,14 @@ function _parser_url_get_not_parsed() {
 /**
  * Adding URL to database
  */
-function _parser_url_add($url, $depth = 0, $page_url = '', $href = '', $element = NULL) {
-  if (!_parser_url_get($url, $element) && strpos($url, 'xandeadx.ru') === FALSE) {
+function _parser_url_add($url, $depth = 0, $page_url = '', $href = '') {
+  if (!_parser_url_get($url) && strpos($url, 'xandeadx.ru') === FALSE) {
     db_insert('parser_urls')
       ->fields(array(
         'url' => $url,
         'depth' => $depth,
         'page_url' => $page_url,
         'href' => $href,
-        'element' => $element,
       ))
       ->execute();
   }
@@ -1021,19 +1054,11 @@ function _parser_url_add($url, $depth = 0, $page_url = '', $href = '', $element 
 /**
  * Mark URL as parsed
  */
-function _parser_url_mark_parsed($url, $element = NULL) {
-  $query = db_update('parser_urls')
+function _parser_url_mark_parsed($url) {
+  db_update('parser_urls')
     ->fields(array('parsed' => 1))
-    ->condition('url', $url);
-  
-  if ($element === NULL) {
-    $query->isNull('element');
-  }
-  else {
-    $query->condition('element', $element);
-  }
-  
-  $query->execute();
+    ->condition('url', $url)
+    ->execute();
 }
 
 /**

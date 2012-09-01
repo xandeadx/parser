@@ -544,12 +544,8 @@ function parser_parse($job, $redirect, &$context) {
       if ($job->black_list && drupal_match_path($href_full, $job->black_list)) {
         continue;
       }
-      if ($job->only_this_domen) {
-        $page_url_parsed_host = str_replace('www.', '', $page_url_parsed['host']);
-        $href_host = str_replace('www.', '', parse_url($href_full, PHP_URL_HOST));
-        if ($page_url_parsed_host != $href_host) {
-          continue;
-        }
+      if ($job->only_this_domen && !_parser_check_urls_host($page_url, $href_full)) {
+        continue;
       }
 
       _parser_url_add($href_full, $url->depth + 1, $page_url, $href);
@@ -1361,5 +1357,16 @@ function _parser_get_page_links($doc) {
   }
   
   return $links;
+}
+
+/**
+ * Return TRUE if URLs have same host
+ */
+function _parser_check_urls_host($url1, $url2) {
+  $url1_host = preg_replace('#^www.#', '', parse_url($url1, PHP_URL_HOST));
+  $url2_host = preg_replace('#^www.#', '', parse_url($url2, PHP_URL_HOST));
+  if ($url1_host == $url2_host) {
+    return TRUE;
+  }
 }
 

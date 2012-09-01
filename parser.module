@@ -820,7 +820,8 @@ function parser_check_code() {
   
   if ($_POST['list_mode_code']) {
     $elements = eval($_POST['list_mode_code']);
-    $doc_element = _parser_create_phpquery(current($elements), $_POST['charset_fix']);
+    $element_html = current($elements);
+    $doc_element = _parser_create_phpquery($element_html, $_POST['charset_fix']);
   }
   
   $result = eval($_POST['field_value']);
@@ -844,11 +845,12 @@ function parser_result_page($job) {
   $result = $query->execute();
   
   $rows = array();
-  foreach ($result as $row) {
+  foreach ($result as $i => $row) {
     $entity = current(entity_load($job->entity_type, array($row->entity_id)));
     $uri = entity_uri($job->entity_type, $entity);
     
     $rows[] = array(
+      $i+1,
       $row->entity_id,
       $row->remote_id,
       l($row->{$label_key}, $uri['path'], $uri['options']),
@@ -858,6 +860,7 @@ function parser_result_page($job) {
     
   return theme('table', array(
     'header' => array(
+      '№',
       $entity_id_key,
       'Remote Entity ID',
       $label_key,

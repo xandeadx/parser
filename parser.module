@@ -128,7 +128,10 @@ function parser_job_form($form, &$form_state, $job) {
   $form['test_url'] = array(
     '#type' => 'textfield',
     '#title' => 'URL тестовой страницы',
-    '#description' => 'Адрес любой страницы, попадающей под условие парсинга, которая будет использоваться для проверки работоспособности кода.',
+    '#description' => '
+      Адрес любой страницы, попадающей под условие парсинга. Страница будет использоваться для проверки
+      работоспособности кода. Пример заполнения: <code>http://drupal.org/project/zen</code>
+    ',
     '#required' => TRUE,
     '#default_value' => isset($job->test_url) ? $job->test_url : '',
     '#maxlength' => 255,
@@ -210,14 +213,15 @@ function parser_job_form($form, &$form_state, $job) {
     ),
   );
   
-  // Remote Entity ID
+  // Remote ID
   $form['remote_id_fieldset'] = array(
     '#type' => 'fieldset',
-    '#title' => 'Remote Entity ID',
+    '#title' => 'Remote ID',
     '#description' => '
-      ID удалённой сущности.
-      Этот ID будет сохранён в бд (в таблице parser_map) и позволит избежать дублей материалов, доступных по нескольким URL.
+      ID сущности на сайте источнике.
+      Этот ID будет сохранён в бд (таблица parser_map) и позволит избежать дублей материалов, доступных по нескольким URL.
       Так же, зная этот ID, можно с помощью функции parser_get_entity_id_by_remote_id() получить ID созданной сущности.
+      Поле является не обязательным, но крайне рекомендованное к заполнению.
     ',
     '#weight' => -1,
     '#group' => 'vertical_tabs',
@@ -395,7 +399,7 @@ function _parser_job_form_advanced_settings($job, $check_button) {
   $form['advanced_settings']['save_url'] = array(
     '#type' => 'checkbox',
     '#title' => 'Сохранять адреса',
-    '#description' => 'Отметьте, если хотите, чтобы у нод были такие же адреса, как на оригинальном сайте. Не включайте эту опцию если на оригинальном сайте не используется ЧПУ (т.е. в адресах есть символ "?")',
+    '#description' => 'Отметьте, если хотите, чтобы у нод были такие же адреса, как на сайте источнике. Не включайте эту опцию если на сайте источнике не используется ЧПУ (т.е. в адресах есть символ "?")',
     '#default_value' => isset($job->save_url) && module_exists('path') ? $job->save_url : 0,
     '#disabled' => !module_exists('path'),
   );
@@ -859,7 +863,7 @@ function parser_result_page($job) {
     'header' => array(
       '№',
       $entity_id_key,
-      'Remote Entity ID',
+      'Remote ID',
       $label_key,
       'URL',
     ),

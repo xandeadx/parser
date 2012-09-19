@@ -259,6 +259,7 @@ function parser_install() {
         ');',
       'author' => 'return 1;',
     ),
+    'list_mode_code' => '',
     'prepare_code' => '',
   );
   entity_save('parser_job', $job);

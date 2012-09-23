@@ -564,6 +564,7 @@ function parser_parse($job, $redirect, &$context) {
     $context['results']['files_from_http_error'] = 0;
     $context['results']['files_from_cache'] = 0;
     $context['results']['redirect'] = $redirect;
+    $context['results']['messages_count'] = _parser_get_watchdog_rows_count();
   }
   
   $url = _parser_url_get_not_parsed();
@@ -754,14 +755,14 @@ function parser_parse($job, $redirect, &$context) {
  */
 function parser_finished($success, $results, $operations) {
   drupal_set_message('
-    ' . ($success ? 'Парсинг завершён' : 'Парсинг завершён с ошибками') . '.
-    Обработано страниц: ' . _parser_url_count(TRUE) . '.
-    Скачано URL: ' . $results['files_from_http'] . '.
-    Не удалось скачать URL: ' . $results['files_from_http_error'] . '.
-    Создано сущностей: ' . l($results['created_entities'], 'admin/structure/parser_jobs/results/' . $results['jid']) . '.
-    Обновлено сущностей: ' . l($results['updated_entities'], 'admin/structure/parser_jobs/results/' . $results['jid']) . '.
-    Затрачено времени: ' . gmdate('H:i:s', time() - $results['time_start']) . '.
-    ' . l('Посмотреть системный журнал', 'admin/reports/dblog') . '
+    ' . ($success ? 'Парсинг завершён' : 'Парсинг завершён с ошибками') . '.<br />
+    Обработано страниц: ' . _parser_url_count(TRUE) . '<br />
+    Скачано URL: ' . $results['files_from_http'] . '<br />
+    Не удалось скачать URL: ' . $results['files_from_http_error'] . '<br />
+    Создано сущностей: ' . l($results['created_entities'], 'admin/structure/parser_jobs/results/' . $results['jid']) . '<br />
+    Обновлено сущностей: ' . l($results['updated_entities'], 'admin/structure/parser_jobs/results/' . $results['jid']) . '<br />
+    Затрачено времени: ' . gmdate('H:i:s', time() - $results['time_start']) . '<br />
+    Новых сообщений в системном журнале: ' . l(_parser_get_watchdog_rows_count() - $results['messages_count'], 'admin/reports/dblog') . '<br />
   ');
   if ($results['redirect']) {
     drupal_goto('admin/structure/parser_jobs/manage/' . $results['jid']);
@@ -1419,4 +1420,11 @@ function _parser_get_bundle_options($bundles) {
     $bundle_options[$bundle_name] = $bundle_info['label'];
   }
   return $bundle_options;
+}
+
+/**
+ * Return rows count in {watchdog} table
+ */
+function _parser_get_watchdog_rows_count() {
+  return db_select('watchdog')->countQuery()->execute()->fetchField();
 }

@@ -236,8 +236,9 @@ function parser_install() {
     'save_url' => 0,
     'no_update' => 0,
     'remote_id_code' => '' .
-      '$id = $doc->find(\'.node\')->attr(\'id\');' . "\n" .
-      'return end(explode(\'-\', $id));',
+      '$attr_id = $doc->find(\'.node\')->attr(\'id\');' . "\n" .
+      '$attr_id_array = explode(\'-\', $attr_id);' . "\n" .
+      'return end($attr_id_array);',
     'fields_code' => array(
       'title' => 'return $doc->find(\'h1#page-subtitle\')->text();',
       'body' => '' .

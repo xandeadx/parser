@@ -738,7 +738,7 @@ function parser_parse($job, $redirect, &$context) {
     Обновлено сущностей: ' . $context['results']['updated_entities'] . '<br />
     Скачано <abbr title="Страниц и файлов">url</abbr>: ' . $context['results']['files_from_http'] . '<br />
     Не удалось скачать url: ' . $context['results']['files_from_http_error'] . '<br />
-    Url взято из кэша: ' . $context['results']['files_from_cache'] . '<br />
+    URL взято из кэша: ' . $context['results']['files_from_cache'] . '<br />
     Затраченное время: ' . gmdate('H:i:s', time() - $context['results']['time_start']) . '
   ';
 
@@ -758,6 +758,7 @@ function parser_finished($success, $results, $operations) {
     ' . ($success ? 'Парсинг завершён' : 'Парсинг завершён с ошибками') . '.<br />
     Обработано страниц: ' . _parser_url_count(TRUE) . '<br />
     Скачано URL: ' . $results['files_from_http'] . '<br />
+    URL взято из кэша: ' . $results['files_from_cache'] . '<br />
     Не удалось скачать URL: ' . $results['files_from_http_error'] . '<br />
     Создано сущностей: ' . l($results['created_entities'], 'admin/structure/parser_jobs/results/' . $results['jid']) . '<br />
     Обновлено сущностей: ' . l($results['updated_entities'], 'admin/structure/parser_jobs/results/' . $results['jid']) . '<br />

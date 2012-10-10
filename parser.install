@@ -136,22 +136,19 @@ function parser_schema() {
   $schema['parser_urls'] = array(
     'fields' => array(
       'url' => array(
-        'type' => 'varchar',
-        'length' => 255,
+        'type' => 'text',
+        'size' => 'normal',
         'not null' => TRUE,
-        'default' => '',
       ),
       'page_url' => array(
-        'type' => 'varchar',
-        'length' => 255,
+        'type' => 'text',
+        'size' => 'normal',
         'not null' => TRUE,
-        'default' => '',
       ),
       'href' => array(
-        'type' => 'varchar',
-        'length' => 255,
+        'type' => 'text',
+        'size' => 'normal',
         'not null' => TRUE,
-        'default' => '',
       ),
       'depth' => array(
         'type' => 'int',
@@ -190,10 +187,9 @@ function parser_schema() {
         'default' => '',
       ),
       'url' => array(
-        'type' => 'varchar',
-        'length' => 255,
+        'type' => 'text',
+        'size' => 'normal',
         'not null' => TRUE,
-        'default' => '',
       ),
       'element' => array(
         'type' => 'int',
@@ -344,3 +340,28 @@ function parser_update_7206() {
   db_drop_field('parser_urls', 'element');
 }
 
+/**
+ * Increase size of fields
+ */
+function parser_update_7207() {
+  db_change_field('parser_urls', 'url', 'url', array(
+    'type' => 'text',
+    'size' => 'normal',
+    'not null' => TRUE,
+  ));
+  db_change_field('parser_urls', 'page_url', 'page_url', array(
+    'type' => 'text',
+    'size' => 'normal',
+    'not null' => TRUE,
+  ));
+  db_change_field('parser_urls', 'href', 'href', array(
+    'type' => 'text',
+    'size' => 'normal',
+    'not null' => TRUE,
+  ));
+  db_change_field('parser_map', 'url', 'url', array(
+    'type' => 'text',
+    'size' => 'normal',
+    'not null' => TRUE,
+  ));
+}

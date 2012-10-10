@@ -230,7 +230,7 @@ function parser_job_form($form, &$form_state, $job) {
   $form['remote_id_fieldset']['remote_id_code'] = array(
     '#type' => 'textarea',
     '#title' => 'PHP код',
-    '#description' => 'PHP код, который должен вернуть число или строку.',
+    '#description' => 'PHP код, который должен вернуть число или строку (не длиннее 255 символов).',
     '#default_value' => isset($job->remote_id_code) ? $job->remote_id_code : '',
     '#rows' => 3,
     '#resizable' => FALSE,

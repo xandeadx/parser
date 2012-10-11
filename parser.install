@@ -164,6 +164,11 @@ function parser_schema() {
         'default' => 0,
       ),
     ),
+    'indexes' => array(
+      'url' => array(
+        array('url', 100),
+      ),
+    ),
   );
   
   $schema['parser_map'] = array(
@@ -365,3 +370,21 @@ function parser_update_7207() {
     'not null' => TRUE,
   ));
 }
+
+/**
+ * Add index in {parser_urls}
+ */
+function parser_update_7208() {
+  db_change_field('parser_urls', 'url', 'url', array(
+    'type' => 'text',
+    'size' => 'normal',
+    'not null' => TRUE,
+  ), array(
+    'indexes' => array(
+      'url' => array(
+        array('url', 100),
+      ),
+    )
+  ));
+}
+

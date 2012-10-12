@@ -29,7 +29,26 @@ function _parser_prepare_field_text_with_summary(&$result, $field_info, $field_i
   if (!empty($result['summary'])) {
     $result['summary'] = trim($result['summary']);
   }
-  if (empty($result['format'])) {
+  if ($field_instance['settings']['text_processing'] == 1 && empty($result['format'])) {
+    $result['format'] = 'filtered_html';
+  }
+}
+
+/**
+ * Prepare field type "text_long"
+ */
+function _parser_prepare_field_text_long(&$result, $field_info, $field_instance, $entity, $job, $page_url, &$context_results) {
+  if (!$result) {
+    $result = NULL;
+    return;
+  }
+  if (is_string($result)) {
+    $result = array('value' => $result);
+  }
+  if (!empty($result['value'])) {
+    $result['value'] = trim($result['value']);
+  }
+  if ($field_instance['settings']['text_processing'] == 1 && empty($result['format'])) {
     $result['format'] = 'filtered_html';
   }
 }

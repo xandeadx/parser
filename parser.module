@@ -727,6 +727,7 @@ function parser_parse($job, $redirect, &$context) {
   if (!$elements || $context['sandbox']['element'] >= count($elements) - 1) {
     _parser_url_mark_parsed($page_url, $context['sandbox']['element']);
     $context['sandbox']['progress']++;
+    $context['sandbox']['element'] = NULL;
   }
 
   $context['sandbox']['max'] = _parser_url_count();

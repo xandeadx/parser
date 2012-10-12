@@ -411,13 +411,6 @@ function _parser_job_form_advanced_settings($job, $check_button) {
     '#default_value' => isset($job->no_update) ? $job->no_update : 0,
   );
   
-  $form['advanced_settings']['clear_watchdog'] = array(
-    '#type' => 'checkbox',
-    '#title' => 'Очистить системный журнал',
-    '#description' => 'Отметьте, если хотите очистить системный журнал (watchdog) перед началом парсинга.',
-    '#default_value' => 0,
-  );
-  
   $form['advanced_settings']['list_mode'] = array(
     '#type' => 'checkbox',
     '#title' => 'Режим списка',
@@ -464,6 +457,13 @@ function _parser_job_form_advanced_settings($job, $check_button) {
     '#default_value' => isset($job->prepare_code) ? $job->prepare_code : '',
     '#rows' => 3,
     '#resizable' => FALSE,
+  );
+  
+  $form['advanced_settings']['clear_watchdog'] = array(
+    '#type' => 'checkbox',
+    '#title' => 'Очистить системный журнал',
+    '#description' => 'Отметьте, если хотите очистить системный журнал (watchdog) перед началом парсинга.',
+    '#default_value' => 0,
   );
   
   return $form;

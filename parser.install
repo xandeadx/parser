@@ -116,6 +116,14 @@ function parser_schema() {
         'type' => 'text',
         'not null' => TRUE,
       ),
+      'cookie' => array(
+        'type' => 'text',
+        'not null' => TRUE,
+      ),
+      'user_agent' => array(
+        'type' => 'text',
+        'not null' => TRUE,
+      ),
       'status' => array(
         'type' => 'int',
         'not null' => TRUE,
@@ -263,6 +271,8 @@ function parser_install() {
     ),
     'list_mode_code' => '',
     'prepare_code' => '',
+    'user_agent' => 'Opera/9.80 (Windows NT 6.1; U; ru) Presto/2.8.131 Version/11.10',
+    'cookie' => '',
   );
   entity_save('parser_job', $job);
 }
@@ -388,3 +398,15 @@ function parser_update_7208() {
   ));
 }
 
+/**
+ * Add new cols to {parser_jobs}
+ */
+function parser_update_7209() {
+  db_add_field('parser_jobs', 'cookie', array(
+    'type' => 'text',
+  ));
+  db_add_field('parser_jobs', 'user_agent', array(
+    'type' => 'text',
+  ));
+  drupal_flush_all_caches();
+}

@@ -459,6 +459,21 @@ function _parser_job_form_advanced_settings($job, $check_button) {
     '#resizable' => FALSE,
   );
   
+  $form['advanced_settings']['user_agent'] = array(
+    '#type' => 'textfield',
+    '#title' => 'User-Agent',
+    '#description' => 'Значение заголовка "User-Agent".',
+    '#default_value' => isset($job->user_agent) ? $job->user_agent : 'Opera/9.80 (Windows NT 6.1; U; ru) Presto/2.8.131 Version/11.10',
+  );
+  
+  $form['advanced_settings']['cookie'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Cookie',
+    '#description' => 'Значение заголовка "Cookie".',
+    '#default_value' => isset($job->cookie) ? $job->cookie : '',
+    '#maxlength' => NULL,
+  );
+  
   $form['advanced_settings']['clear_watchdog'] = array(
     '#type' => 'checkbox',
     '#title' => 'Очистить системный журнал',
@@ -570,7 +585,7 @@ function parser_parse($job, $redirect, &$context) {
   $url = _parser_url_get_not_parsed();
   $page_url = $url->url;
   $page_url_parsed = parse_url($page_url);
-  $page = _parser_get_page_by_url($page_url, $job->site_charset, $context['results']);
+  $page = _parser_get_page_by_url($page_url, _parser_get_request_options($job), $job->site_charset, $context['results']);
   $doc = _parser_create_phpquery($page, $job->charset_fix);
   
   $elements = NULL;
@@ -810,7 +825,7 @@ function parser_entity_view($entity, $entity_type, $view_mode, $langcode) {
  * Menu callback. Check php code.
  */
 function parser_check_code() {
-  $params = array('test_url', 'site_charset', 'charset_fix', 'field_name', 'field_value', 'list_mode_code');
+  $params = array('test_url', 'site_charset', 'charset_fix', 'field_name', 'field_value', 'list_mode_code', 'user_agent', 'cookie');
   foreach ($params as $param) {
     if (!isset($_POST[$param])) {
       echo 'bad params';
@@ -818,7 +833,11 @@ function parser_check_code() {
     }
   }
   
-  $page = _parser_get_page_by_url($_POST['test_url'], $_POST['site_charset']);
+  $job = (object)array(
+    'user_agent' => $_POST['user_agent'],
+    'cookie' => $_POST['cookie'],
+  );
+  $page = _parser_get_page_by_url($_POST['test_url'], _parser_get_request_options($job), $_POST['site_charset']);
   $page_url = $_POST['test_url'];
   $doc = _parser_create_phpquery($page, $_POST['charset_fix']);
   
@@ -984,7 +1003,7 @@ function parser_download_images($html, $page_url, $path = 'public://images', &$s
     
     if (!file_exists($path . '/' . $local_image_name)) {
       // Download image to cache
-      $cache_file_uri = _parser_download_url_to_cache($image_url, $stat);
+      $cache_file_uri = _parser_download_url_to_cache($image_url, array(), $stat);
       if (!$cache_file_uri) {
         continue;
       }
@@ -1089,8 +1108,8 @@ function _parser_url_count($parsed = null) {
 /**
  * Return page html by URL
  */
-function _parser_get_page_by_url($url, $charset = 'auto', &$results = NULL) {
-  $page_cache_uri = _parser_download_url_to_cache($url, $results);
+function _parser_get_page_by_url($url, $options = array(), $charset = 'auto', &$results = NULL) { 
+  $page_cache_uri = _parser_download_url_to_cache($url, $options, $results);
   if (!$page_cache_uri) {
     return NULL;
   }
@@ -1117,11 +1136,10 @@ function _parser_get_page_by_url($url, $charset = 'auto', &$results = NULL) {
 /**
  * Download remote url to cache and return cache uri
  */
-function _parser_download_url_to_cache($url, &$stat = NULL) {
+function _parser_download_url_to_cache($url, $options = array(), &$stat = NULL) {
   $cache_uri = 'public://parser_cache/' . md5($url);
   
   if (!file_exists($cache_uri)) {
-    $options = array('headers' => array('User-Agent' => 'Opera/9.80 (Windows NT 6.1; U; ru) Presto/2.8.131 Version/11.10')); 
     $result = drupal_http_request($url, $options);
     if ($result->code == 303 && !empty($result->headers['location'])) {
       $result = drupal_http_request($result->headers['location'], $options);
@@ -1429,4 +1447,18 @@ function _parser_get_bundle_options($bundles) {
  */
 function _parser_get_watchdog_rows_count() {
   return db_select('watchdog')->countQuery()->execute()->fetchField();
+}
+
+/**
+ * Return options for drupal_http_request()
+ */
+function _parser_get_request_options($job) {
+  $options = array();
+  if ($job->user_agent) {
+    $options['headers']['User-Agent'] = $job->user_agent;
+  }
+  if ($job->cookie) {
+    $options['headers']['Cookie'] = $job->cookie;
+  }
+  return $options;
 }

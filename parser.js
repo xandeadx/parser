@@ -12,7 +12,9 @@
           charset_fix: $('#edit-charset-fix').attr('checked') ? 1 : 0,
           field_name: $textarea.attr('name'),
           field_value: $textarea.val(),
-          list_mode_code: $('#edit-list-mode-code').val()
+          list_mode_code: $('#edit-list-mode-code').val(),
+          user_agent: $('#edit-user-agent').val(),
+          cookie: $('#edit-cookie').val()
         };
       
         $('<div id="parser-dialog">Загрузка...</div>').dialog({

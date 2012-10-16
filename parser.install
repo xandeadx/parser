@@ -116,11 +116,7 @@ function parser_schema() {
         'type' => 'text',
         'not null' => TRUE,
       ),
-      'cookie' => array(
-        'type' => 'text',
-        'not null' => TRUE,
-      ),
-      'user_agent' => array(
+      'headers' => array(
         'type' => 'text',
         'not null' => TRUE,
       ),
@@ -271,8 +267,7 @@ function parser_install() {
     ),
     'list_mode_code' => '',
     'prepare_code' => '',
-    'user_agent' => 'Opera/9.80 (Windows NT 6.1; U; ru) Presto/2.8.131 Version/11.10',
-    'cookie' => '',
+    'headers' => 'User-Agent: Opera/9.80 (Windows NT 6.1; U; ru) Presto/2.8.131 Version/11.10' . "\n",
   );
   entity_save('parser_job', $job);
 }
@@ -406,6 +401,18 @@ function parser_update_7209() {
     'type' => 'text',
   ));
   db_add_field('parser_jobs', 'user_agent', array(
+    'type' => 'text',
+  ));
+  drupal_flush_all_caches();
+}
+
+/**
+ * Remove and add cols in {parser_jobs}
+ */
+function parser_update_7210() {
+  db_drop_field('parser_jobs', 'user_agent');
+  db_drop_field('parser_jobs', 'cookie');
+  db_add_field('parser_jobs', 'headers', array(
     'type' => 'text',
   ));
   drupal_flush_all_caches();

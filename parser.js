@@ -13,8 +13,7 @@
           field_name: $textarea.attr('name'),
           field_value: $textarea.val(),
           list_mode_code: $('#edit-list-mode-code').val(),
-          user_agent: $('#edit-user-agent').val(),
-          cookie: $('#edit-cookie').val()
+          headers: $('#edit-headers').val()
         };
       
         $('<div id="parser-dialog">Загрузка...</div>').dialog({

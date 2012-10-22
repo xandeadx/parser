@@ -121,7 +121,7 @@ function _parser_prepare_field_file(&$result, $field_info, $field_instance, $ent
   }
   
   // Download file to cache
-  $cache_uri = _parser_download_url_to_cache($file_url, $job->headers, $stat);
+  $cache_uri = _parser_download_url_to_cache($file_url, $job->headers, FALSE, $stat);
   if (!$cache_uri) {
     $result = NULL;
     return;

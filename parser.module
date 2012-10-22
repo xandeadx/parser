@@ -411,6 +411,13 @@ function _parser_job_form_advanced_settings($job, $check_button) {
     '#default_value' => isset($job->no_update) ? $job->no_update : 0,
   );
   
+  $form['advanced_settings']['force_download'] = array(
+    '#type' => 'checkbox',
+    '#title' => 'Не использовать кэш',
+    '#description' => 'Отметьте, если хотите чтобы парсер не использовал свой файловый кэш.',
+    '#default_value' => isset($job->force_download) ? $job->force_download : 0,
+  );
+  
   $form['advanced_settings']['list_mode'] = array(
     '#type' => 'checkbox',
     '#title' => 'Режим списка',
@@ -577,7 +584,7 @@ function parser_parse($job, $redirect, &$context) {
   $url = _parser_url_get_not_parsed();
   $page_url = $url->url;
   $page_url_parsed = parse_url($page_url);
-  $page = _parser_get_page_by_url($page_url, $job->headers, $job->site_charset, $context['results']);
+  $page = _parser_get_page_by_url($page_url, $job->headers, $job->site_charset, $job->force_download, $context['results']);
   $doc = _parser_create_phpquery($page, $job->charset_fix);
   
   $elements = NULL;
@@ -991,7 +998,7 @@ function parser_download_images($html, $page_url, $path = 'public://images', &$s
     
     if (!file_exists($path . '/' . $local_image_name)) {
       // Download image to cache
-      $cache_file_uri = _parser_download_url_to_cache($image_url, array(), $stat);
+      $cache_file_uri = _parser_download_url_to_cache($image_url, array(), FALSE, $stat);
       if (!$cache_file_uri) {
         continue;
       }
@@ -1096,8 +1103,8 @@ function _parser_url_count($parsed = null) {
 /**
  * Return page html by URL
  */
-function _parser_get_page_by_url($url, $headers = array(), $charset = 'auto', &$results = NULL) { 
-  $page_cache_uri = _parser_download_url_to_cache($url, $headers, $results);
+function _parser_get_page_by_url($url, $headers = array(), $charset = 'auto', $force_download = FALSE, &$results = NULL) { 
+  $page_cache_uri = _parser_download_url_to_cache($url, $headers, $force_download, $results);
   if (!$page_cache_uri) {
     return NULL;
   }
@@ -1124,10 +1131,10 @@ function _parser_get_page_by_url($url, $headers = array(), $charset = 'auto', &$
 /**
  * Download remote url to cache and return cache uri
  */
-function _parser_download_url_to_cache($url, $headers = array(), &$stat = NULL) {
+function _parser_download_url_to_cache($url, $headers = array(), $force_download = FALSE, &$stat = NULL) {
   $cache_uri = 'public://parser_cache/' . md5($url);
   
-  if (!file_exists($cache_uri)) {
+  if (!file_exists($cache_uri) || $force_download) {
     if (is_string($headers)) {
       $headers = _parser_get_headers_array($headers);
     }
@@ -1152,18 +1159,18 @@ function _parser_download_url_to_cache($url, $headers = array(), &$stat = NULL) 
       return NULL;
     }
     
-    file_unmanaged_save_data($result->data, $cache_uri);
+    file_unmanaged_save_data($result->data, $cache_uri, FILE_EXISTS_REPLACE);
     if ($stat) {
       $stat['files_from_http']++;
     }
-    return $cache_uri;
   }
   else {
     if ($stat) {
       $stat['files_from_cache']++;
     }
-    return $cache_uri;
   }
+  
+  return $cache_uri;
 }
 
 /**

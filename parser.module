@@ -77,7 +77,6 @@ function parser_job_form($form, &$form_state, $job) {
   $check_button = array('#field_prefix' => '<input type="button" value="проверить" class="form-submit check-button" />');
   $fields_code = isset($job->fields_code) ? $job->fields_code : array();
   $entity_types = entity_get_info();
-  $entity_type_options = _parser_get_entity_type_options($entity_types);
   $fields_info = field_info_fields();
   $formats = filter_formats();
   $weight = 0;
@@ -190,7 +189,7 @@ function parser_job_form($form, &$form_state, $job) {
     '#type' => 'select',
     '#title' => 'Тип сущности (entity type)',
     '#description' => 'Выберите тип сущности, который будет создавать парсер.',
-    '#options' => $entity_type_options,
+    '#options' => _parser_get_entity_type_options($entity_types),
     '#default_value' => isset($job->entity_type) ? $job->entity_type : 'node',
     '#required' => TRUE,
     '#ajax' => array('callback' => 'parser_job_form_entity_type_ajax_callback'),
@@ -414,7 +413,7 @@ function _parser_job_form_advanced_settings($job, $check_button) {
   $form['advanced_settings']['force_download'] = array(
     '#type' => 'checkbox',
     '#title' => 'Не использовать кэш',
-    '#description' => 'Отметьте, если хотите чтобы парсер не использовал свой файловый кэш.',
+    '#description' => 'Отметьте, если хотите чтобы парсер скачивал url-ы даже если они есть в кэше.',
     '#default_value' => isset($job->force_download) ? $job->force_download : 0,
   );
   
@@ -586,6 +585,8 @@ function parser_parse($job, $redirect, &$context) {
   $page_url_parsed = parse_url($page_url);
   $page = _parser_get_page_by_url($page_url, $job->headers, $job->site_charset, $job->force_download, $context['results']);
   $doc = _parser_create_phpquery($page, $job->charset_fix);
+  $base = $doc->find('base')->attr('href');
+  $relative_url = $base ? $base : $page_url;
   
   $elements = NULL;
   if ($job->list_mode_code) {
@@ -604,7 +605,7 @@ function parser_parse($job, $redirect, &$context) {
   if ($url->depth < $job->depth) {
     // Find links
     foreach (_parser_get_page_links($doc) as $href) {
-      $href_full = _parser_get_full_url($href, $page_url);
+      $href_full = _parser_get_full_url($href, $relative_url);
       
       if ($job->white_list && !drupal_match_path($href_full, $job->white_list)) {
         continue;
@@ -685,11 +686,11 @@ function parser_parse($job, $redirect, &$context) {
         if (function_exists($function)) {
           if ($field_is_multi_value) {
             foreach (array_keys($result) as $key) {
-              $function($result[$key], $field_info, $fields_instances[$property_name], $entity, $job, $page_url, $context['results']);
+              $function($result[$key], $field_info, $fields_instances[$property_name], $entity, $job, $relative_url, $context['results']);
             }
           }
           else {
-            $function($result, $field_info, $fields_instances[$property_name], $entity, $job, $page_url, $context['results']);
+            $function($result, $field_info, $fields_instances[$property_name], $entity, $job, $relative_url, $context['results']);
           }
         }
       }
@@ -987,11 +988,11 @@ function parser_entity_property_info_alter(&$info) {
 /**
  * Find images in html, download and change href
  */
-function parser_download_images($html, $page_url, $path = 'public://images', &$stat = NULL) {
+function parser_download_images($html, $relative_url, $path = 'public://images', &$stat = NULL) {
   $doc = _parser_create_phpquery($html);
   
   foreach ($doc->find('img') as $img) {
-    $image_url = _parser_get_full_url(pq($img)->attr('src'), $page_url);
+    $image_url = _parser_get_full_url(pq($img)->attr('src'), $relative_url);
     $image_url_parsed = parse_url($image_url);
     $local_image_name = ltrim($image_url_parsed['path'], '/');
     $local_image_name = str_replace('/', '-', $local_image_name);
@@ -1228,30 +1229,30 @@ function _parser_set_rows(&$form) {
 /**
  * Return full url
  */
-function _parser_get_full_url($url, $page_url) {
+function _parser_get_full_url($url, $relative_url) {
   $url = trim($url);
   $url = preg_replace('/#.*/', '', $url);
-  $page_url_parsed = parse_url($page_url);
-  if (!isset($page_url_parsed['path'])) {
-    $page_url_parsed['path'] = '/';
+  $relative_url_parsed = parse_url($relative_url);
+  if (!isset($relative_url_parsed['path'])) {
+    $relative_url_parsed['path'] = '/';
   }
 
   // example: //wikimedia.org/dir/image.png
   if (substr($url, 0, 2) == '//') {
-    $url = $page_url_parsed['scheme'] . ':' . $url;
+    $url = $relative_url_parsed['scheme'] . ':' . $url;
   }
   // example: /dir/image.png
   elseif (substr($url, 0, 1) == '/') {
-    $url = $page_url_parsed['scheme'] . '://' . $page_url_parsed['host'] . $url;
+    $url = $relative_url_parsed['scheme'] . '://' . $relative_url_parsed['host'] . $url;
   }
   // example: dir/image.png
   elseif (strpos($url, 'http') !== 0) {
-    $path = preg_replace('#/[^/]+$#', '', $page_url_parsed['path']);
+    $path = preg_replace('#/[^/]+$#', '', $relative_url_parsed['path']);
     $path = trim($path, '/');
     if ($path) {
       $path .= '/';
     }
-    $url = $page_url_parsed['scheme'] . '://' . $page_url_parsed['host'] . '/' . $path . $url;
+    $url = $relative_url_parsed['scheme'] . '://' . $relative_url_parsed['host'] . '/' . $path . $url;
   }
   
   $url = str_replace(' ', '+', $url);

@@ -869,10 +869,9 @@ function parser_result_page($job) {
   $query->fields('e', array($label_key));
   $query->innerJoin($entity_info['base table'], 'e', 'e.' . $entity_info['entity keys']['id'] . ' = pm.entity_id');
   $query->condition('jid', $job->jid);
-  $result = $query->execute();
   
   $rows = array();
-  foreach ($result as $i => $row) {
+  foreach ($query->execute() as $i => $row) {
     $entity = current(entity_load($job->entity_type, array($row->entity_id)));
     $uri = entity_uri($job->entity_type, $entity);
     

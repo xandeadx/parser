@@ -920,24 +920,22 @@ function parser_rollback_form($form, $form_state, $job) {
 /**
  * Rollback form submit callback
  */
-function parser_rollback_form_submit($form, $form_state) {
-  if ($form_state['values']['confirm']) {
-    $job = parser_job_load($form_state['values']['jid']);
-    $deleted_count = 0;
-    
-    $query = db_select('parser_map', 'pm');
-    $query->fields('pm', array('entity_id'));
-    $query->condition('jid', $job->jid);
-    $result = $query->execute();
-    
-    foreach ($result as $row) {
-      entity_delete($job->entity_type, $row->entity_id);
-    }
-    
-    drupal_set_message('Удалено ' . $result->rowCount() . ' сущностей.');
+function parser_rollback_form_submit($form, &$form_state) {
+  $job = parser_job_load($form_state['values']['jid']);
+  $deleted_count = 0;
+  
+  $query = db_select('parser_map', 'pm');
+  $query->fields('pm', array('entity_id'));
+  $query->condition('jid', $job->jid);
+  $result = $query->execute();
+  
+  foreach ($result as $row) {
+    entity_delete($job->entity_type, $row->entity_id);
   }
   
-  drupal_goto('admin/structure/parser_jobs');
+  drupal_set_message('Удалено ' . $result->rowCount() . ' сущностей.');
+  
+  $form_state['redirect'] = 'admin/structure/parser_jobs';
 }
 
 /**

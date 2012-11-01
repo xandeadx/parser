@@ -42,7 +42,6 @@
             codeMirrors[i].save();
           }
         });
-        
       }).addClass('codemirror-processed');
 
       // Refresh code mirror on open vertical tab

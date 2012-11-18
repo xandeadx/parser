@@ -711,13 +711,15 @@ function parser_parse($job, $redirect, &$context) {
     }
     
     // Set Path alias
-    if ($job->save_url && !isset($entity->path)) {
+    if ($job->save_url) {
       $alias = trim($page_url_parsed['path'], '/');
       $alias = str_replace('%20', ' ', $alias);
-      $entity->path = array(
-        'alias' => $alias,
-        'language' => LANGUAGE_NONE,
-      );
+      if (!path_load(array('alias' => $alias))) {
+        $entity->path = array(
+          'alias' => $alias,
+          'language' => LANGUAGE_NONE,
+        );
+      }
     }
     
     // Prepare entity

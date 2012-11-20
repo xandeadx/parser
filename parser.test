@@ -1,10 +1,10 @@
 <?php
 
-class ParserTestCase extends DrupalWebTestCase {
+class ParserUnitTestCase extends DrupalUnitTestCase {
   public static function getInfo() {
     return array(
-      'name' => 'Parser module functionality',
-      'description' => 'Tests Parser module',
+      'name' => 'Parser module unit tests',
+      'description' => 'Parser module unit tests',
       'group' => 'Parser',
     );
   }

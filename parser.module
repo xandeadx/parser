@@ -1035,6 +1035,20 @@ function parser_entity_property_info_alter(&$info) {
 }
 
 /**
+ * Set setter callback for 'format' property
+ */
+function _parser_set_format_setter_callback(&$property_info) {
+  if (
+    isset($property_info['type']) &&
+    ($property_info['type'] == 'text_formatted' || $property_info['type'] == 'list<text_formatted>') &&
+    isset($property_info['property info']['format']) && 
+    !isset($property_info['property info']['format']['setter callback'])
+  ) {
+    $property_info['property info']['format']['setter callback'] = 'entity_property_verbatim_set';
+  }
+}
+
+/**
  * Find images in html, download and change href
  */
 function parser_download_images($html, $base_url, $path = 'public://images', &$stat = NULL) {
@@ -1067,20 +1081,6 @@ function parser_download_images($html, $base_url, $path = 'public://images', &$s
   }
   
   return $doc->html();
-}
-
-/**
- * Set setter callback for 'format' property
- */
-function _parser_set_format_setter_callback(&$property_info) {
-  if (
-    isset($property_info['type']) &&
-    ($property_info['type'] == 'text_formatted' || $property_info['type'] == 'list<text_formatted>') &&
-    isset($property_info['property info']['format']) && 
-    !isset($property_info['property info']['format']['setter callback'])
-  ) {
-    $property_info['property info']['format']['setter callback'] = 'entity_property_verbatim_set';
-  }
 }
 
 /**
@@ -1341,16 +1341,9 @@ function _parser_get_field_structure($field_info, $spaces = 2) {
     if (!isset($property_info['setter callback'])) {
       continue;
     }
-    $strucure .= _parcer_spaces($spaces) . "'$property_name' => \${$property_name}, // " . $property_info['label'] . ' (' . $property_info['type'] . ', ' . (isset($property_info['required']) ? 'required' : 'optional') . ')<br />';
+    $strucure .= str_repeat('&nbsp;', $count) . "'$property_name' => \${$property_name}, // " . $property_info['label'] . ' (' . $property_info['type'] . ', ' . (isset($property_info['required']) ? 'required' : 'optional') . ')<br />';
   }
   return $strucure;
-}
-
-/**
- * Return spaces
- */
-function _parcer_spaces($count) {
-  return str_repeat('&nbsp;', $count);
 }
 
 /**

@@ -598,7 +598,7 @@ function parser_parse($job, $redirect, &$context) {
   $page = _parser_get_page_by_url($page_url, $job->headers, $job->site_charset, $job->force_download, $context['results']);
   $doc = _parser_create_phpquery($page, $job->charset_fix);
   $base = $doc->find('base')->attr('href');
-  $relative_url = $base ? $base : $page_url;
+  $base_url = $base ? $base : $page_url;
   
   $elements = NULL;
   if ($job->list_mode_code) {
@@ -617,7 +617,7 @@ function parser_parse($job, $redirect, &$context) {
   if ($url->depth < $job->depth) {
     // Find links
     foreach (_parser_get_page_links($doc) as $href) {
-      $href_full = _parser_get_full_url($href, $relative_url);
+      $href_full = parser_get_absolute_url($base_url, $href);
       
       if ($job->white_list && !drupal_match_path($href_full, $job->white_list)) {
         continue;
@@ -698,11 +698,11 @@ function parser_parse($job, $redirect, &$context) {
         if (function_exists($function)) {
           if ($field_is_multi_value) {
             foreach (array_keys($result) as $key) {
-              $function($result[$key], $field_info, $fields_instances[$property_name], $entity, $job, $relative_url, $context['results']);
+              $function($result[$key], $field_info, $fields_instances[$property_name], $entity, $job, $base_url, $context['results']);
             }
           }
           else {
-            $function($result, $field_info, $fields_instances[$property_name], $entity, $job, $relative_url, $context['results']);
+            $function($result, $field_info, $fields_instances[$property_name], $entity, $job, $base_url, $context['results']);
           }
         }
       }
@@ -1037,11 +1037,11 @@ function parser_entity_property_info_alter(&$info) {
 /**
  * Find images in html, download and change href
  */
-function parser_download_images($html, $relative_url, $path = 'public://images', &$stat = NULL) {
+function parser_download_images($html, $base_url, $path = 'public://images', &$stat = NULL) {
   $doc = _parser_create_phpquery($html);
   
   foreach ($doc->find('img') as $img) {
-    $image_url = _parser_get_full_url(pq($img)->attr('src'), $relative_url);
+    $image_url = parser_get_absolute_url($base_url, pq($img)->attr('src'));
     $image_url_parsed = parse_url($image_url);
     $local_image_name = ltrim($image_url_parsed['path'], '/');
     $local_image_name = str_replace('/', '-', $local_image_name);
@@ -1276,37 +1276,52 @@ function _parser_set_rows(&$form) {
 }
 
 /**
- * Return full url
+ * Return absolute url by base and relative url (deprecated)
  */
-function _parser_get_full_url($url, $relative_url) {
-  $url = trim($url);
-  $url = preg_replace('/#.*/', '', $url);
-  $relative_url_parsed = parse_url($relative_url);
+function _parser_get_full_url($relative_url, $base_url) {
+  $relative_url = trim($relative_url);
+  $relative_url = preg_replace('/#.*/', '', $relative_url);
+  $relative_url_parsed = parse_url($base_url);
   if (!isset($relative_url_parsed['path'])) {
     $relative_url_parsed['path'] = '/';
   }
 
   // example: //wikimedia.org/dir/image.png
-  if (drupal_substr($url, 0, 2) == '//') {
-    $url = $relative_url_parsed['scheme'] . ':' . $url;
+  if (drupal_substr($relative_url, 0, 2) == '//') {
+    $relative_url = $relative_url_parsed['scheme'] . ':' . $relative_url;
   }
   // example: /dir/image.png
-  elseif (drupal_substr($url, 0, 1) == '/') {
-    $url = $relative_url_parsed['scheme'] . '://' . $relative_url_parsed['host'] . $url;
+  elseif (drupal_substr($relative_url, 0, 1) == '/') {
+    $relative_url = $relative_url_parsed['scheme'] . '://' . $relative_url_parsed['host'] . $relative_url;
   }
   // example: dir/image.png
-  elseif (!preg_match('#^https?://#', $url)) {
+  elseif (!preg_match('#^[a-z]+://#', $relative_url)) {
     $path = preg_replace('#/[^/]+$#', '', $relative_url_parsed['path']);
     $path = trim($path, '/');
     if ($path) {
       $path .= '/';
     }
-    $url = $relative_url_parsed['scheme'] . '://' . $relative_url_parsed['host'] . '/' . $path . $url;
+    $relative_url = $relative_url_parsed['scheme'] . '://' . $relative_url_parsed['host'] . '/' . $path . $relative_url;
   }
   
-  $url = str_replace(' ', '+', $url);
+  $relative_url = str_replace(' ', '+', $relative_url);
   
-  return $url;
+  return $relative_url;
+}
+
+/**
+ * Return absolute url by base and relative url
+ */
+function parser_get_absolute_url($base_url, $relative_url) {
+  if (!function_exists('url_to_absolute')) {
+    require_once('AbsoluteUrl/url_to_absolute.php');
+  }
+  
+  if (preg_match('#^[a-z]+://[^/]+$#', $base_url)) {
+    $base_url .= '/';
+  }
+  
+  return url_to_absolute($base_url, $relative_url);
 }
 
 /**

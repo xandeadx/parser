@@ -4,3 +4,4 @@ version = 7.x-2.x-dev
 core = 7.x
 dependencies[] = entity
 configure = admin/structure/parser_jobs
+files[] = parser.test

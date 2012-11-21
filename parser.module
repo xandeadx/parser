@@ -175,7 +175,7 @@ function parser_job_form($form, &$form_state, $job) {
       Маски адресов, по которым будет запрещено ходить парсеру. Каждая маска на новой строке. Пример заполнения:
       <code>http://drupal.org/project/uc_*</code>
     ',
-    '#default_value' => isset($job->black_list) ? $job->black_list : '',
+    '#default_value' => isset($job->black_list) ? $job->black_list : implode("\n", array('*.jpg', '*.png', '*.zip', '*.rar', '*.pdf')),
     '#rows' => 3,
   );
   
@@ -592,10 +592,12 @@ function parser_parse($job, $redirect, &$context) {
     $context['results']['messages_count'] = _parser_get_watchdog_rows_count();
   }
   
+  $GLOBALS['stat'] = $context['results'];
+  
   $url = _parser_url_get_not_parsed();
   $page_url = $url->url;
   $page_url_parsed = parse_url($page_url);
-  $page = _parser_get_page_by_url($page_url, $job->headers, $job->site_charset, $job->force_download, $context['results']);
+  $page = _parser_get_page_by_url($page_url, $job->headers, $job->site_charset, $job->force_download);
   $doc = _parser_create_phpquery($page, $job->charset_fix);
   $base = $doc->find('base')->attr('href');
   $base_url = $base ? $base : $page_url;
@@ -669,12 +671,12 @@ function parser_parse($job, $redirect, &$context) {
     // Load entity
     if ($entity_id) {
       $entity = current(entity_load($job->entity_type, array($entity_id)));
-      $context['results']['updated_entities']++;
+      $GLOBALS['stat']['updated_entities']++;
     }
     // Create entity object
     if (!$entity_id || !$entity) {
       $entity = entity_create($job->entity_type, array($entity_type_info['entity keys']['bundle'] => $job->bundle));
-      $context['results']['created_entities']++;
+      $GLOBALS['stat']['created_entities']++;
     }
     
     $entity_wrapper = entity_metadata_wrapper($job->entity_type, $entity);
@@ -698,11 +700,11 @@ function parser_parse($job, $redirect, &$context) {
         if (function_exists($function)) {
           if ($field_is_multi_value) {
             foreach (array_keys($result) as $key) {
-              $function($result[$key], $field_info, $fields_instances[$property_name], $entity, $job, $base_url, $context['results']);
+              $function($result[$key], $field_info, $fields_instances[$property_name], $entity, $job, $base_url);
             }
           }
           else {
-            $function($result, $field_info, $fields_instances[$property_name], $entity, $job, $base_url, $context['results']);
+            $function($result, $field_info, $fields_instances[$property_name], $entity, $job, $base_url);
           }
         }
       }
@@ -765,12 +767,13 @@ function parser_parse($job, $redirect, &$context) {
     Завершён парсинг страницы глубиной ' . $url->depth . ' <em>' . $page_url . '</em><br />
     Обработано страниц: ' . $context['sandbox']['progress'] . '<br />
     Страниц в очереди: ' . ($context['sandbox']['max'] - $context['sandbox']['progress']) . '<br />
-    Создано сущностей: ' . $context['results']['created_entities'] . '<br />
-    Обновлено сущностей: ' . $context['results']['updated_entities'] . '<br />
-    Скачано <abbr title="Страниц и файлов">url</abbr>: ' . $context['results']['files_from_http'] . '<br />
-    Не удалось скачать url: ' . $context['results']['files_from_http_error'] . '<br />
-    URL взято из кэша: ' . $context['results']['files_from_cache'] . '<br />
-    Затраченное время: ' . gmdate('H:i:s', time() - $context['results']['time_start']) . '
+    Создано сущностей: ' . $GLOBALS['stat']['created_entities'] . '<br />
+    Обновлено сущностей: ' . $GLOBALS['stat']['updated_entities'] . '<br />
+    Скачано url: ' . $GLOBALS['stat']['files_from_http'] . '<br />
+    Не удалось скачать url: ' . $GLOBALS['stat']['files_from_http_error'] . '<br />
+    URL взято из кэша: ' . $GLOBALS['stat']['files_from_cache'] . '<br />
+    Затраченное время: ' . gmdate('H:i:s', time() - $GLOBALS['stat']['time_start']) . '<br />
+    Новых сообщений в системном журнале: ' . (_parser_get_watchdog_rows_count() - $GLOBALS['stat']['messages_count']) . '<br />
   ';
 
   if ($job->parse_limit && $context['sandbox']['created_entities'] >= $job->parse_limit) {
@@ -779,6 +782,8 @@ function parser_parse($job, $redirect, &$context) {
   elseif ($context['sandbox']['progress'] <= $context['sandbox']['max']) {
     $context['finished'] = $context['sandbox']['progress'] / $context['sandbox']['max'];
   }
+  
+  $context['results'] = $GLOBALS['stat'];
 }
 
 /**
@@ -889,6 +894,8 @@ function parser_result_page($job) {
       l($row->url, $row->url),
     );
   }
+  
+  drupal_set_title('Сущности, созданные заданием "' . $job->title . '"');
   
   return array(
     '#theme' => 'table',
@@ -1049,38 +1056,56 @@ function _parser_set_format_setter_callback(&$property_info) {
 }
 
 /**
- * Find images in html, download and change href
+ * Find files in html, download and change tag attribute
  */
-function parser_download_images($html, $base_url, $path = 'public://images', &$stat = NULL) {
+function _parser_download_files($html, $selector, $attr, $base_url, $path = 'public://') {
   $doc = _parser_create_phpquery($html);
   
-  foreach ($doc->find('img') as $img) {
-    $image_url = parser_get_absolute_url($base_url, pq($img)->attr('src'));
-    $image_url_parsed = parse_url($image_url);
-    $local_image_name = ltrim($image_url_parsed['path'], '/');
-    $local_image_name = str_replace('/', '-', $local_image_name);
+  foreach ($doc->find($selector) as $element) {
+    $file_url = parser_get_absolute_url($base_url, pq($element)->attr($attr));
+    $file_url_info = parse_url($file_url);
+    $local_file_name = ltrim($file_url_info['path'], '/');
+    $local_file_name = str_replace('/', '-', $local_file_name);
     
-    if (!file_exists($path . '/' . $local_image_name)) {
+    if (!file_exists($path . '/' . $local_file_name)) {
       // Download image to cache
-      $cache_file_uri = _parser_download_url_to_cache($image_url, array(), FALSE, $stat);
+      $cache_file_uri = _parser_download_url_to_cache($file_url, array(), FALSE);
       if (!$cache_file_uri) {
         continue;
       }
       
       // Copy image from cache
-      $file = _parser_copy_file($cache_file_uri, $path . '/' . $local_image_name);
+      $file = _parser_copy_file($cache_file_uri, $path . '/' . $local_file_name);
       if ($file) {
         $file->status = FILE_STATUS_PERMANENT;
         file_save($file);
       }
     }
     
-    $new_src = file_create_url($path . '/' . $local_image_name);
-    $new_src = drupal_substr($new_src, drupal_strlen($GLOBALS['base_root']));
-    pq($img)->attr('src', $new_src);
+    $new_atr = file_create_url($path . '/' . $local_file_name);
+    $new_atr = drupal_substr($new_atr, drupal_strlen($GLOBALS['base_root']));
+    pq($element)->attr($attr, $new_atr);
   }
   
   return $doc->html();
+}
+
+/**
+ * Find images in html, download images and change images src
+ */
+function parser_download_images($html, $base_url, $path = 'public://images') {
+  return _parser_download_files($html, 'img', 'src', $base_url, $path);
+}
+
+/**
+ * Find links in html, download files and change links href
+ */
+function parser_download_links($html, $extensions, $base_url, $path = 'public://') {
+  $selectors = array();
+  foreach ($extensions as $extension) {
+    $selectors[] = 'a[href$=".' . $extension . '"]';
+  }
+  return _parser_download_files($html, implode(', ', $selectors), 'href', $base_url, $path);
 }
 
 /**
@@ -1153,8 +1178,8 @@ function _parser_url_count($parsed = NULL) {
 /**
  * Return page html by URL
  */
-function _parser_get_page_by_url($url, $headers = array(), $charset = 'auto', $force_download = FALSE, &$results = NULL) { 
-  $page_cache_uri = _parser_download_url_to_cache($url, $headers, $force_download, $results);
+function _parser_get_page_by_url($url, $headers = array(), $charset = 'auto', $force_download = FALSE) { 
+  $page_cache_uri = _parser_download_url_to_cache($url, $headers, $force_download);
   if (!$page_cache_uri) {
     return NULL;
   }
@@ -1181,7 +1206,7 @@ function _parser_get_page_by_url($url, $headers = array(), $charset = 'auto', $f
 /**
  * Download remote url to cache and return cache uri
  */
-function _parser_download_url_to_cache($url, $headers = array(), $force_download = FALSE, &$stat = NULL) {
+function _parser_download_url_to_cache($url, $headers = array(), $force_download = FALSE) {
   $cache_uri = 'public://parser_cache/' . md5($url);
   
   if (!file_exists($cache_uri) || $force_download) {
@@ -1196,28 +1221,20 @@ function _parser_download_url_to_cache($url, $headers = array(), $force_download
     
     if (!empty($result->error)) {
       _parser_watchdog('Ошибка при закачке ' . check_plain($url) . ': ' . check_plain($result->error) . (isset($result->data) ? ', <b>Результат</b>: ' . check_plain(drupal_substr($result->data, 0, 1000)) : ''), NULL, WATCHDOG_ERROR);
-      if ($stat) {
-        $stat['files_from_http_error']++;
-      }
+      $GLOBALS['stat']['files_from_http_error']++;
       return NULL;
     }
     if (!$result->data) {
       _parser_watchdog('Ошибка при закачке ' . check_plain($url) . ': сервер не возвратил данных.', NULL, WATCHDOG_ERROR);
-      if ($stat) {
-        $stat['files_from_http_error']++;
-      }
+      $GLOBALS['stat']['files_from_http_error']++;
       return NULL;
     }
     
     file_unmanaged_save_data($result->data, $cache_uri, FILE_EXISTS_REPLACE);
-    if ($stat) {
-      $stat['files_from_http']++;
-    }
+    $GLOBALS['stat']['files_from_http']++;
   }
   else {
-    if ($stat) {
-      $stat['files_from_cache']++;
-    }
+    $GLOBALS['stat']['files_from_cache']++;
   }
   
   return $cache_uri;
@@ -1341,7 +1358,7 @@ function _parser_get_field_structure($field_info, $spaces = 2) {
     if (!isset($property_info['setter callback'])) {
       continue;
     }
-    $strucure .= str_repeat('&nbsp;', $count) . "'$property_name' => \${$property_name}, // " . $property_info['label'] . ' (' . $property_info['type'] . ', ' . (isset($property_info['required']) ? 'required' : 'optional') . ')<br />';
+    $strucure .= str_repeat('&nbsp;', $spaces) . "'$property_name' => \${$property_name}, // " . $property_info['label'] . ' (' . $property_info['type'] . ', ' . (isset($property_info['required']) ? 'required' : 'optional') . ')<br />';
   }
   return $strucure;
 }

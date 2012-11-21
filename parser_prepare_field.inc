@@ -3,7 +3,7 @@
 /**
  * Prepare field type "text"
  */
-function _parser_prepare_field_text(&$result, $field_info, $field_instance, $entity, $job, $base_url, &$context_results) {
+function _parser_prepare_field_text(&$result, $field_info, $field_instance, $entity, $job, $base_url) {
   $result = trim($result);
   if (!empty($field_info['settings']['max_length']) && drupal_strlen($result) > $field_info['settings']['max_length']) {
     $original_result = $result;
@@ -15,7 +15,7 @@ function _parser_prepare_field_text(&$result, $field_info, $field_instance, $ent
 /**
  * Prepare field type "text_long"
  */
-function _parser_prepare_field_text_long(&$result, $field_info, $field_instance, $entity, $job, $base_url, &$context_results) {
+function _parser_prepare_field_text_long(&$result, $field_info, $field_instance, $entity, $job, $base_url) {
   if (!$result) {
     $result = NULL;
     return;
@@ -34,8 +34,8 @@ function _parser_prepare_field_text_long(&$result, $field_info, $field_instance,
 /**
  * Prepare field type "text_with_summary"
  */
-function _parser_prepare_field_text_with_summary(&$result, $field_info, $field_instance, $entity, $job, $base_url, &$context_results) {
-  _parser_prepare_field_text_long($result, $field_info, $field_instance, $entity, $job, $base_url, $context_results);
+function _parser_prepare_field_text_with_summary(&$result, $field_info, $field_instance, $entity, $job, $base_url) {
+  _parser_prepare_field_text_long($result, $field_info, $field_instance, $entity, $job, $base_url);
   
   if (!empty($result['summary'])) {
     $result['summary'] = trim($result['summary']);
@@ -45,7 +45,7 @@ function _parser_prepare_field_text_with_summary(&$result, $field_info, $field_i
 /**
  * Prepare field type "taxonomy_term_reference"
  */
-function _parser_prepare_field_taxonomy_term_reference(&$result, $field_info, $field_instance, $entity, $job, $base_url, &$context_results) {
+function _parser_prepare_field_taxonomy_term_reference(&$result, $field_info, $field_instance, $entity, $job, $base_url) {
   if (is_string($result)) {
     $voc_machine_name = $field_info['settings']['allowed_values'][0]['vocabulary'];
     $vid = taxonomy_vocabulary_machine_name_load($voc_machine_name)->vid;
@@ -62,7 +62,7 @@ function _parser_prepare_field_taxonomy_term_reference(&$result, $field_info, $f
 /**
  * Prepare field type "file"
  */
-function _parser_prepare_field_file(&$result, $field_info, $field_instance, $entity, $job, $base_url, &$context_results) {
+function _parser_prepare_field_file(&$result, $field_info, $field_instance, $entity, $job, $base_url) {
   if (!$result) {
     $result = NULL;
     return;
@@ -110,7 +110,7 @@ function _parser_prepare_field_file(&$result, $field_info, $field_instance, $ent
   }
   
   // Download file to cache
-  $cache_uri = _parser_download_url_to_cache($file_url, $job->headers, FALSE, $stat);
+  $cache_uri = _parser_download_url_to_cache($file_url, $job->headers, FALSE);
   if (!$cache_uri) {
     $result = NULL;
     return;
@@ -129,7 +129,7 @@ function _parser_prepare_field_file(&$result, $field_info, $field_instance, $ent
 /**
  * Prepare field type "image"
  */
-function _parser_prepare_field_image(&$result, $field_info, $field_instance, $entity, $job, $base_url, &$context_results) {
-  _parser_prepare_field_file($result, $field_info, $field_instance, $entity, $job, $base_url, $context_results);
+function _parser_prepare_field_image(&$result, $field_info, $field_instance, $entity, $job, $base_url) {
+  _parser_prepare_field_file($result, $field_info, $field_instance, $entity, $job, $base_url);
 }
 

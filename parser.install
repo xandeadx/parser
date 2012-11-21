@@ -236,7 +236,10 @@ function parser_install() {
       'http://drupal.org/project/issues*' . "\n" .
       'http://drupal.org/project/themes?solrsort*' . "\n" .
       'http://drupal.org/project/themes?filters*' . "\n" .
-      'http://drupal.org/project/modules*',
+      'http://drupal.org/project/modules*' . "\n" .
+      '*.jpg' . "\n" .
+      '*.zip' . "\n" .
+      '*.tar.gz',
     'check_code' => '' .
       'if ($doc->find(\'a[href="/project/themes"].active\')->length() && $doc->find(\'.view-project-release-download-table\')->length()) {' . "\n" .
       '  return TRUE;' . "\n" .

@@ -592,7 +592,7 @@ function parser_parse($job, $redirect, &$context) {
     $context['results']['messages_count'] = _parser_get_watchdog_rows_count();
   }
   
-  $GLOBALS['stat'] = $context['results'];
+  $GLOBALS['parser']['stat'] = $context['results'];
   
   $url = _parser_url_get_not_parsed();
   $page_url = $url->url;
@@ -671,12 +671,12 @@ function parser_parse($job, $redirect, &$context) {
     // Load entity
     if ($entity_id) {
       $entity = current(entity_load($job->entity_type, array($entity_id)));
-      $GLOBALS['stat']['updated_entities']++;
+      $GLOBALS['parser']['stat']['updated_entities']++;
     }
     // Create entity object
     if (!$entity_id || !$entity) {
       $entity = entity_create($job->entity_type, array($entity_type_info['entity keys']['bundle'] => $job->bundle));
-      $GLOBALS['stat']['created_entities']++;
+      $GLOBALS['parser']['stat']['created_entities']++;
     }
     
     $entity_wrapper = entity_metadata_wrapper($job->entity_type, $entity);
@@ -763,17 +763,18 @@ function parser_parse($job, $redirect, &$context) {
   }
 
   $context['sandbox']['max'] = _parser_url_count();
+  $context['results'] = $GLOBALS['parser']['stat'];
   $context['message'] = '
     Завершён парсинг страницы глубиной ' . $url->depth . ' <em>' . $page_url . '</em><br />
     Обработано страниц: ' . $context['sandbox']['progress'] . '<br />
     Страниц в очереди: ' . ($context['sandbox']['max'] - $context['sandbox']['progress']) . '<br />
-    Создано сущностей: ' . $GLOBALS['stat']['created_entities'] . '<br />
-    Обновлено сущностей: ' . $GLOBALS['stat']['updated_entities'] . '<br />
-    Скачано url: ' . $GLOBALS['stat']['files_from_http'] . '<br />
-    Не удалось скачать url: ' . $GLOBALS['stat']['files_from_http_error'] . '<br />
-    URL взято из кэша: ' . $GLOBALS['stat']['files_from_cache'] . '<br />
-    Затраченное время: ' . gmdate('H:i:s', time() - $GLOBALS['stat']['time_start']) . '<br />
-    Новых сообщений в системном журнале: ' . (_parser_get_watchdog_rows_count() - $GLOBALS['stat']['messages_count']) . '<br />
+    Создано сущностей: ' . $context['results']['created_entities'] . '<br />
+    Обновлено сущностей: ' . $context['results']['updated_entities'] . '<br />
+    Скачано url: ' . $context['results']['files_from_http'] . '<br />
+    Не удалось скачать url: ' . $context['results']['files_from_http_error'] . '<br />
+    URL взято из кэша: ' . $context['results']['files_from_cache'] . '<br />
+    Затраченное время: ' . gmdate('H:i:s', time() - $context['results']['time_start']) . '<br />
+    Новых сообщений в системном журнале: ' . (_parser_get_watchdog_rows_count() - $context['results']['messages_count']) . '<br />
   ';
 
   if ($job->parse_limit && $context['sandbox']['created_entities'] >= $job->parse_limit) {
@@ -782,8 +783,6 @@ function parser_parse($job, $redirect, &$context) {
   elseif ($context['sandbox']['progress'] <= $context['sandbox']['max']) {
     $context['finished'] = $context['sandbox']['progress'] / $context['sandbox']['max'];
   }
-  
-  $context['results'] = $GLOBALS['stat'];
 }
 
 /**
@@ -1221,20 +1220,20 @@ function _parser_download_url_to_cache($url, $headers = array(), $force_download
     
     if (!empty($result->error)) {
       _parser_watchdog('Ошибка при закачке ' . check_plain($url) . ': ' . check_plain($result->error) . (isset($result->data) ? ', <b>Результат</b>: ' . check_plain(drupal_substr($result->data, 0, 1000)) : ''), NULL, WATCHDOG_ERROR);
-      $GLOBALS['stat']['files_from_http_error']++;
+      $GLOBALS['parser']['stat']['files_from_http_error']++;
       return NULL;
     }
     if (!$result->data) {
       _parser_watchdog('Ошибка при закачке ' . check_plain($url) . ': сервер не возвратил данных.', NULL, WATCHDOG_ERROR);
-      $GLOBALS['stat']['files_from_http_error']++;
+      $GLOBALS['parser']['stat']['files_from_http_error']++;
       return NULL;
     }
     
     file_unmanaged_save_data($result->data, $cache_uri, FILE_EXISTS_REPLACE);
-    $GLOBALS['stat']['files_from_http']++;
+    $GLOBALS['parser']['stat']['files_from_http']++;
   }
   else {
-    $GLOBALS['stat']['files_from_cache']++;
+    $GLOBALS['parser']['stat']['files_from_cache']++;
   }
   
   return $cache_uri;

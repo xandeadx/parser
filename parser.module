@@ -1090,14 +1090,14 @@ function _parser_download_files($html, $selector, $attr, $base_url, $path = 'pub
 }
 
 /**
- * Find images in html, download images and change images src
+ * Find img tag in html, download files and change src attribute
  */
 function parser_download_images($html, $base_url, $path = 'public://images') {
   return _parser_download_files($html, 'img', 'src', $base_url, $path);
 }
 
 /**
- * Find links in html, download files and change links href
+ * Find links in html, download files and change href attribute
  */
 function parser_download_links($html, $extensions, $base_url, $path = 'public://') {
   $selectors = array();
@@ -1105,6 +1105,16 @@ function parser_download_links($html, $extensions, $base_url, $path = 'public://
     $selectors[] = 'a[href$=".' . $extension . '"]';
   }
   return _parser_download_files($html, implode(', ', $selectors), 'href', $base_url, $path);
+}
+
+/**
+ * Run job in background
+ */
+function parser_run_in_background($jid) {
+  parser_run_batch($jid);
+  $batch = &batch_get();
+  $batch['progressive'] = FALSE;
+  batch_process('');
 }
 
 /**

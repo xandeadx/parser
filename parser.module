@@ -1118,6 +1118,17 @@ function parser_run_in_background($jid) {
 }
 
 /**
+ * Return taxonomy term object by term name.
+ */
+function parser_get_term_by_name($term_name, $vid = NULL) {
+  $conditions = array('name' => $term_name);
+  if ($vid) {
+    $conditions['vid'] = $vid;
+  }
+  return current(taxonomy_term_load_multiple(array(), $conditions));
+}
+
+/**
  * Get URL info
  */
 function _parser_url_get($url) {

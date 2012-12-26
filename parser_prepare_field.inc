@@ -50,7 +50,7 @@ function _parser_prepare_field_taxonomy_term_reference(&$result, $field_info, $f
     $voc_machine_name = $field_info['settings']['allowed_values'][0]['vocabulary'];
     $vid = taxonomy_vocabulary_machine_name_load($voc_machine_name)->vid;
     $term_name = trim($result);
-    $term = current(taxonomy_term_load_multiple(array(), array('name' => $term_name, 'vid' => $vid)));
+    $term = parser_get_term_by_name($term_name, $vid);
     if (!$term) {
       $term = (object)array('vid' => $vid, 'name' => $term_name);
       taxonomy_term_save($term);

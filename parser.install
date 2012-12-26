@@ -89,13 +89,13 @@ function parser_schema() {
       ),
       'entity_type' => array(
         'type' => 'varchar',
-        'length' => 20,
+        'length' => 100,
         'not null' => TRUE,
         'default' => '',
       ),
       'bundle' => array(
         'type' => 'varchar',
-        'length' => 20,
+        'length' => 100,
         'not null' => TRUE,
         'default' => '',
       ),

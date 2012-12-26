@@ -224,8 +224,7 @@ function parser_schema() {
 function parser_install() {
   $cache_dir = 'public://parser_cache';
   file_prepare_directory($cache_dir, FILE_CREATE_DIRECTORY);
-  
-  $job = array(
+  entity_create('parser_job', array(
     'title' => 'Парсинг шаблонов с drupal.org',
     'start_url' => 'http://drupal.org/project/themes',
     'test_url' => 'http://drupal.org/project/zen',
@@ -279,8 +278,7 @@ function parser_install() {
     'prepare_code' => '',
     'headers' => 'User-Agent: Opera/9.80 (Windows NT 6.1; U; ru) Presto/2.8.131 Version/11.10' . "\n",
     'force_download' => 0,
-  );
-  entity_save('parser_job', $job);
+  ))->save();
 }
 
 /**

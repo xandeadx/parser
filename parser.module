@@ -894,9 +894,9 @@ function parser_result_page($job) {
     
     $rows[] = array(
       $i + 1,
-      $row->entity_id,
+      l($row->entity_id, $uri['path'], $uri['options']),
       $row->remote_id,
-      l($label_key ? $row->{$label_key} : 'none', $uri['path'], $uri['options']),
+      $label_key ? $row->{$label_key} : '',
       l($row->url, $row->url),
     );
   }
@@ -905,7 +905,13 @@ function parser_result_page($job) {
   
   return array(
     '#theme' => 'table',
-    '#header' => array('№', $entity_info['entity keys']['id'], 'Remote ID', $label_key ? $label_key : 'Label', 'URL'),
+    '#header' => array(
+      '№',
+      'Entity ID (' . $entity_info['entity keys']['id'] . ')',
+      'Remote ID',
+      'Label' . ($label_key ? ' (' . $label_key . ')' : ''),
+      'Original URL',
+    ),
     '#rows' => $rows,
     '#empty' => 'Пусто...',
   );

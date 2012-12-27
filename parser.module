@@ -852,6 +852,11 @@ function parser_check_code() {
     }
   }
   
+  $GLOBALS['parser']['stat'] = array(
+    'files_from_http' => 0,
+    'files_from_http_error' => 0,
+    'files_from_cache' => 0,
+  );
   $page = _parser_get_page_by_url($_POST['test_url'], $_POST['headers'], $_POST['site_charset']);
   $page_url = $_POST['test_url'];
   $doc = _parser_create_phpquery($page, $_POST['charset_fix']);
@@ -872,11 +877,13 @@ function parser_check_code() {
  */
 function parser_result_page($job) {
   $entity_info = entity_get_info($job->entity_type);
-  $label_key = $entity_info['entity keys']['label'];
+  $label_key = isset($entity_info['entity keys']['label']) ? $entity_info['entity keys']['label'] : '';
   
   $query = db_select('parser_map', 'pm');
   $query->fields('pm', array('entity_id', 'url', 'remote_id'));
-  $query->fields('e', array($label_key));
+  if ($label_key) {
+    $query->fields('e', array($label_key));
+  }
   $query->innerJoin($entity_info['base table'], 'e', 'e.' . $entity_info['entity keys']['id'] . ' = pm.entity_id');
   $query->condition('jid', $job->jid);
   
@@ -889,7 +896,7 @@ function parser_result_page($job) {
       $i + 1,
       $row->entity_id,
       $row->remote_id,
-      l($row->{$label_key}, $uri['path'], $uri['options']),
+      l($label_key ? $row->{$label_key} : 'none', $uri['path'], $uri['options']),
       l($row->url, $row->url),
     );
   }
@@ -898,7 +905,7 @@ function parser_result_page($job) {
   
   return array(
     '#theme' => 'table',
-    '#header' => array('№', $entity_info['entity keys']['id'], 'Remote ID', $label_key, 'URL'),
+    '#header' => array('№', $entity_info['entity keys']['id'], 'Remote ID', $label_key ? $label_key : 'Label', 'URL'),
     '#rows' => $rows,
     '#empty' => 'Пусто...',
   );
@@ -1118,6 +1125,46 @@ function parser_run_in_background($jid) {
 }
 
 /**
+ * Return entity object by conditions.
+ * 
+ * @param $entity_type
+ *   The entity type to load, e.g. node or user.
+ * @param $properties
+ *   An associative array of properties values.
+ * @param $fields
+ *   An associative array of fields values.
+ * 
+ * Example:
+ * @code
+ * $node = parser_get_entity_by_conditions('node', array('title' => 'Foo'), array('field_category' => array('tid' => 2)));
+ * $term = parser_get_entity_by_conditions('taxonomy_term', array('name' => 'Foo', 'vid' => 3));
+ * @endcode
+ */
+function parser_get_entity_by_conditions($entity_type, $properties = NULL, $fields = NULL) {
+  $query = new EntityFieldQuery();
+  $query->entityCondition('entity_type', $entity_type);
+  if ($properties) {
+    foreach ($properties as $name => $value) {
+      $query->propertyCondition($name, $value);
+    }
+  }
+  if ($fields) {
+    foreach ($fields as $name => $values) {
+      foreach ($values as $column => $value) {
+        $query->fieldCondition($name, $column, $value);
+      }
+    }
+  }
+  $query->range(0, 1);
+  $result = $query->execute();
+  if ($result) {
+    $id = key($result[$entity_type]);
+    $entities = entity_load($entity_type, array($id));
+    return reset($entities);
+  }
+}
+
+/**
  * Return taxonomy term object by term name.
  */
 function parser_get_term_by_name($term_name, $vid = NULL) {
@@ -1125,7 +1172,7 @@ function parser_get_term_by_name($term_name, $vid = NULL) {
   if ($vid) {
     $conditions['vid'] = $vid;
   }
-  return current(taxonomy_term_load_multiple(array(), $conditions));
+  return parser_get_entity_by_conditions('taxonomy_term', $conditions);
 }
 
 /**

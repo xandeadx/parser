@@ -1182,6 +1182,19 @@ function parser_get_term_by_name($term_name, $vid = NULL) {
 }
 
 /**
+ * Return entity id from feeds items.
+ */
+function parser_get_entity_id_from_feeds_items($importer_name, $guid) {
+  return db_select('feeds_item', 'fi')
+    ->fields('fi', array('entity_id'))
+    ->condition('fi.id', $importer_name)
+    ->condition('fi.guid', $guid)
+    ->range(0, 1)
+    ->execute()
+    ->fetchField();
+}
+
+/**
  * Get URL info
  */
 function _parser_url_get($url) {

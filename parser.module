@@ -1134,7 +1134,7 @@ function parser_run_in_background($jid) {
  * Return entity object by conditions.
  * 
  * @param $entity_type
- *   The entity type to load, e.g. node or user.
+ *   The entity type to load, e.g. node, user or taxonomy_term.
  * @param $properties
  *   An associative array of properties values.
  * @param $fields
@@ -1142,8 +1142,15 @@ function parser_run_in_background($jid) {
  * 
  * Example:
  * @code
- * $node = parser_get_entity_by_conditions('node', array('title' => 'Foo'), array('field_category' => array('tid' => 2)));
- * $term = parser_get_entity_by_conditions('taxonomy_term', array('name' => 'Foo', 'vid' => 3));
+ * $node = parser_get_entity_by_conditions(
+ *   'node',
+ *   array('type' => 'article', 'title' => 'Foo'),
+ *   array('field_category' => array('tid' => 2))
+ * );
+ * $term = parser_get_entity_by_conditions(
+ *   'taxonomy_term',
+ *   array('name' => 'Foo', 'vid' => 3)
+ * );
  * @endcode
  */
 function parser_get_entity_by_conditions($entity_type, $properties = NULL, $fields = NULL) {

@@ -28,6 +28,14 @@ function parser_menu() {
     'type' => MENU_CALLBACK,
   );
   
+  $items['admin/structure/parser_jobs/settings'] = array(
+    'title' => 'Settings',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('parser_settings_form'),
+    'access arguments' => array('administer site configuration'),
+    'type' => MENU_LOCAL_TASK,
+  );
+  
   return $items;
 }
 
@@ -830,13 +838,15 @@ function parser_entity_delete($entity, $entity_type) {
  * Show link to original page. Only for admin.
  */
 function parser_entity_view($entity, $entity_type, $view_mode, $langcode) {
-  $entity_id = entity_id($entity_type, $entity);
-  
-  if ($view_mode == 'full' && $GLOBALS['user']->uid == 1 && ($url = _parser_get_url_by_entity_id($entity_type, $entity_id))) {
-    $entity->content['parser_url'] = array(
-      '#markup' => '<p>Контент спарсен со страницы ' . l($url, 'http://anonym.to/?' . $url, array('attributes' => array('target' => '_blank'))) . '</p>', 
-      '#weight' => 100, 
-    );
+  if ($view_mode == 'full' && $GLOBALS['user']->uid == 1 && variable_get('parser_show_source_link', 1)) {
+    $entity_id = entity_id($entity_type, $entity);
+    $url = _parser_get_url_by_entity_id($entity_type, $entity_id);
+    if ($url) {
+      $entity->content['parser_url'] = array(
+        '#markup' => '<p>Контент спарсен со страницы ' . l($url, 'http://anonym.to/?' . $url, array('attributes' => array('target' => '_blank'))) . '</p>', 
+        '#weight' => 100, 
+      );
+    }
   }
 }
 
@@ -991,6 +1001,28 @@ function parser_library() {
   );
 
   return $libraries;
+}
+
+/**
+ * Settings form.
+ */
+function parser_settings_form($form) {
+  $form['parser_show_source_link'] = array(
+    '#type' => 'checkbox',
+    '#title' => 'Показывать ссылку на источник на страницах созданных сущностей.',
+    '#default_value' => variable_get('parser_show_source_link', 1),
+  );
+  
+  $form['actions'] = array(
+    '#type' => 'actions',
+  );
+  
+  $form['actions']['submit'] = array(
+    '#type' => 'submit',
+    '#value' => 'Сохранить',
+  );
+  
+  return system_settings_form($form);
 }
 
 /**

@@ -832,7 +832,7 @@ function parser_entity_delete($entity, $entity_type) {
 function parser_entity_view($entity, $entity_type, $view_mode, $langcode) {
   $entity_id = entity_id($entity_type, $entity);
   
-  if ($view_mode == 'full' && $GLOBALS['user']->uid == 1 && ($url = _parser_get_url_by_entity_id($entity_id))) {
+  if ($view_mode == 'full' && $GLOBALS['user']->uid == 1 && ($url = _parser_get_url_by_entity_id($entity_type, $entity_id))) {
     $entity->content['parser_url'] = array(
       '#markup' => '<p>Контент спарсен со страницы ' . l($url, 'http://anonym.to/?' . $url, array('attributes' => array('target' => '_blank'))) . '</p>', 
       '#weight' => 100, 
@@ -1351,10 +1351,12 @@ function _parser_map_save($record) {
 /**
  * Return URL by entity id
  */
-function _parser_get_url_by_entity_id($entity_id, $jid = NULL) {
-  $query = db_select('parser_map', 'pn')
-    ->fields('pn', array('url'))
-    ->condition('entity_id', $entity_id);
+function _parser_get_url_by_entity_id($entity_type, $entity_id, $jid = NULL) {
+  $query = db_select('parser_map', 'pn');
+  $query->fields('pn', array('url'));
+  $query->innerJoin('parser_jobs', 'pj', 'pj.jid = pn.jid');
+  $query->condition('pj.entity_type', $entity_type);
+  $query->condition('pn.entity_id', $entity_id);
     
   if ($jid) {
     $query->condition('jid', $jid);

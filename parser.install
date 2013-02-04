@@ -127,6 +127,13 @@ function parser_schema() {
         'not null' => TRUE,
         'default' => 0,
       ),
+      'sleep' => array(
+        'type' => 'int',
+        'size' => 'tiny',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
       'status' => array(
         'type' => 'int',
         'not null' => TRUE,
@@ -441,3 +448,16 @@ function parser_update_7211() {
   drupal_flush_all_caches();
 }
 
+/**
+ * Add new col to {parser_jobs}
+ */
+function parser_update_7212() {
+  db_add_field('parser_jobs', 'sleep', array(
+    'type' => 'int',
+    'size' => 'tiny',
+    'unsigned' => TRUE,
+    'not null' => TRUE,
+    'default' => 0,
+  ));
+  drupal_flush_all_caches();
+}

@@ -381,6 +381,15 @@ function _parser_job_form_advanced_settings($job, $check_button) {
     '#size' => 5,
   );
   
+  $form['advanced_settings']['sleep'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Задержка между http запросами к сайту источнику',
+    '#description' => 'Количество секунд между http запросами к сайту источнику. Помогает обойти защиту от парсинга. По умолчанию задержка отсутствует.',
+    '#default_value' => !empty($job->sleep) ? $job->sleep : 0,
+    '#size' => 5,
+    '#field_suffix' => 'сек.',
+  );
+  
   $form['advanced_settings']['site_charset'] = array(
     '#type' => 'select',
     '#title' => 'Кодировка сайта',
@@ -575,6 +584,8 @@ function parser_run_batch($job, $redirect = FALSE) {
  * Parse page
  */
 function parser_parse($job, $redirect, &$context) {
+  drupal_set_time_limit(0);
+  
   if (empty($context['sandbox'])) {
     $context['sandbox']['progress'] = 0;
     $context['sandbox']['entity_ids'] = array();
@@ -593,6 +604,7 @@ function parser_parse($job, $redirect, &$context) {
   }
   
   $GLOBALS['parser']['stat'] = $context['results'];
+  $GLOBALS['parser']['sleep'] = $job->sleep;
   
   $url = _parser_url_get_not_parsed();
   $page_url = $url->url;
@@ -757,13 +769,15 @@ function parser_parse($job, $redirect, &$context) {
   }
   
   if (!$elements || $context['sandbox']['element'] >= count($elements) - 1) {
-    _parser_url_mark_parsed($page_url, $context['sandbox']['element']);
+    _parser_url_mark_parsed($page_url);
     $context['sandbox']['progress']++;
     $context['sandbox']['element'] = NULL;
   }
 
   $context['sandbox']['max'] = _parser_url_count();
   $context['results'] = $GLOBALS['parser']['stat'];
+  
+  $new_watchdog_row_count = _parser_get_watchdog_rows_count() - $context['results']['messages_count'];
   $context['message'] = '
     Завершён парсинг страницы глубиной ' . $url->depth . ' <em>' . $page_url . '</em><br />
     Обработано страниц: ' . $context['sandbox']['progress'] . '<br />
@@ -774,8 +788,13 @@ function parser_parse($job, $redirect, &$context) {
     Не удалось скачать url: ' . $context['results']['files_from_http_error'] . '<br />
     URL взято из кэша: ' . $context['results']['files_from_cache'] . '<br />
     Затраченное время: ' . gmdate('H:i:s', time() - $context['results']['time_start']) . '<br />
-    Новых сообщений в системном журнале: ' . (_parser_get_watchdog_rows_count() - $context['results']['messages_count']) . '<br />
+    Новых сообщений в системном журнале: ' . $new_watchdog_row_count . '<br />
   ';
+  if ($new_watchdog_row_count) {
+    $last_watchdog_message = _parser_get_last_watchdog_message();
+    $last_watchdog_message_time = format_date($last_watchdog_message->timestamp, 'custom', 'H:i:s');
+    $context['message'] .= 'Последнее сообщение: <em>(' . $last_watchdog_message_time . ') ' . check_plain($last_watchdog_message->message) . '</em><br />';
+  }
 
   if ($job->parse_limit && $context['sandbox']['created_entities'] >= $job->parse_limit) {
     $context['finished'] = 1;
@@ -1303,6 +1322,10 @@ function _parser_download_url_to_cache($url, $headers = array(), $force_download
   $cache_uri = 'public://parser_cache/' . md5($url);
   
   if (!file_exists($cache_uri) || $force_download) {
+    if (!empty($GLOBALS['parser']['sleep'])) {
+      sleep($GLOBALS['parser']['sleep']);
+    }
+    
     if (is_string($headers)) {
       $headers = _parser_get_headers_array($headers);
     }
@@ -1313,12 +1336,12 @@ function _parser_download_url_to_cache($url, $headers = array(), $force_download
     }
     
     if (!empty($result->error)) {
-      _parser_watchdog('Ошибка при закачке ' . check_plain($url) . ': ' . check_plain($result->error) . (isset($result->data) ? ', <b>Результат</b>: ' . check_plain(drupal_substr($result->data, 0, 1000)) : ''), NULL, WATCHDOG_ERROR);
+      _parser_watchdog('Ошибка при закачке "' . check_plain($url) . '": ' . check_plain($result->error) . (isset($result->data) ? ', <b>Результат</b>: ' . check_plain(drupal_substr($result->data, 0, 1000)) : ''), NULL, WATCHDOG_ERROR);
       $GLOBALS['parser']['stat']['files_from_http_error']++;
       return NULL;
     }
     if (!$result->data) {
-      _parser_watchdog('Ошибка при закачке ' . check_plain($url) . ': сервер не возвратил данных.', NULL, WATCHDOG_ERROR);
+      _parser_watchdog('Ошибка при закачке "' . check_plain($url) . '": сервер не возвратил данных.', NULL, WATCHDOG_ERROR);
       $GLOBALS['parser']['stat']['files_from_http_error']++;
       return NULL;
     }
@@ -1560,15 +1583,21 @@ function _parser_get_page_links($doc) {
     if (!$href) {
       continue;
     }
+    // Continue if $href == '#content'
     if (drupal_substr($href, 0, 1) == '#') {
       continue;
     }
+    // Continue if $href == 'ftp://ftp.drupal.org'
     if (preg_match('#^([a-z]+)://#', $href, $matches) && !in_array($matches[1], array('http', 'https'))) {
       continue;
     }
+    // Continue if $href == 'javascript:alert();'
     if (strpos($href, 'javascript:') === 0 || strpos($href, 'mailto:') === 0) {
       continue;
     }
+    
+    // Remove hash
+    $href = preg_replace('/#.*$/', '', $href);
     
     $links[] = $href;
   }
@@ -1629,4 +1658,16 @@ function _parser_get_headers_array($headers) {
     }
   }
   return $headers_array;
+}
+
+/**
+ * Return last watchdog message.
+ */
+function _parser_get_last_watchdog_message() {
+  return  db_select('watchdog', 'w')
+    ->fields('w', array('message', 'timestamp'))
+    ->orderBy('w.wid', 'DESC')
+    ->range(0, 1)
+    ->execute()
+    ->fetch();
 }

@@ -20,14 +20,16 @@ function _parser_prepare_field_text_long(&$result, $field_info, $field_instance,
     $result = NULL;
     return;
   }
-  if (is_string($result)) {
-    $result = array('value' => $result);
-  }
-  if (!empty($result['value'])) {
-    $result['value'] = trim($result['value']);
-  }
-  if ($field_instance['settings']['text_processing'] == 1 && empty($result['format'])) {
-    $result['format'] = 'filtered_html';
+  if ($field_instance['settings']['text_processing']) {
+    if (is_string($result)) {
+      $result = array('value' => $result);
+    }
+    if (!empty($result['value'])) {
+      $result['value'] = trim($result['value']);
+    }
+    if (empty($result['format'])) {
+      $result['format'] = 'filtered_html';
+    }
   }
 }
 

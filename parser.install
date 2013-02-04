@@ -120,6 +120,10 @@ function parser_schema() {
         'type' => 'text',
         'not null' => TRUE,
       ),
+      'proxies' => array(
+        'type' => 'text',
+        'not null' => TRUE,
+      ),
       'force_download' => array(
         'type' => 'int',
         'size' => 'tiny',
@@ -284,7 +288,9 @@ function parser_install() {
     'list_mode_code' => '',
     'prepare_code' => '',
     'headers' => 'User-Agent: Opera/9.80 (Windows NT 6.1; U; ru) Presto/2.8.131 Version/11.10' . "\n",
+    'proxies' => '',
     'force_download' => 0,
+    'sleep' => 0,
   ))->save();
 }
 
@@ -458,6 +464,16 @@ function parser_update_7212() {
     'unsigned' => TRUE,
     'not null' => TRUE,
     'default' => 0,
+  ));
+  drupal_flush_all_caches();
+}
+
+/**
+ * Add new col to {parser_jobs}
+ */
+function parser_update_7213() {
+  db_add_field('parser_jobs', 'proxies', array(
+    'type' => 'text',
   ));
   drupal_flush_all_caches();
 }

@@ -351,12 +351,17 @@ function parser_job_form($form, &$form_state, $job) {
   
   $form['actions']['submit'] = array(
     '#type' => 'submit',
-    '#value' => 'Сохранить задание',
+    '#value' => 'Сохранить',
   );
   
   $form['actions']['submit_and_start'] = array(
     '#type' => 'submit',
-    '#value' => 'Сохранить задание и Начать парсинг',
+    '#value' => 'Сохранить и Начать',
+  );
+  
+  $form['actions']['submit_and_resume'] = array(
+    '#type' => 'submit',
+    '#value' => 'Сохранить и Продолжить',
   );
   
   _parser_set_rows($form);
@@ -501,7 +506,7 @@ function _parser_job_form_advanced_settings($job, $check_button) {
     '#type' => 'checkbox',
     '#title' => 'Очистить системный журнал',
     '#description' => 'Отметьте, если хотите очистить системный журнал (watchdog) перед началом парсинга.',
-    '#default_value' => 0,
+    '#default_value' => TRUE,
   );
   
   return $form;
@@ -558,21 +563,27 @@ function parser_job_form_submit(&$form, &$form_state) {
     $form_state['redirect'] = 'admin/structure/parser_jobs/manage/' . $job->jid;
   }
   // Save and Run
-  else {
+  elseif ($form_state['clicked_button']['#value'] == $form_state['values']['submit_and_start']) {
     parser_run_batch($job, request_path() == 'admin/structure/parser_jobs/add');
+  }
+  // Save and Resume
+  elseif ($form_state['clicked_button']['#value'] == $form_state['values']['submit_and_resume']) {
+    parser_run_batch($job, request_path() == 'admin/structure/parser_jobs/add', TRUE);
   }
 }
 
 /**
  * Init batch
  */
-function parser_run_batch($job, $redirect = FALSE) {
+function parser_run_batch($job, $redirect = FALSE, $resume = FALSE) {
   if (is_numeric($job)) {
     $job = parser_job_load($job);
   }
   
-  _parser_url_delete_all();
-  _parser_url_add($job->start_url);
+  if (!$resume) {
+    _parser_url_delete_all();
+    _parser_url_add($job->start_url);
+  }
 
   if (!empty($job->clear_watchdog)) {
     db_delete('watchdog')->execute();
@@ -595,7 +606,7 @@ function parser_parse($job, $redirect, &$context) {
   drupal_set_time_limit(0);
   
   if (empty($context['sandbox'])) {
-    $context['sandbox']['progress'] = 0;
+    $context['sandbox']['progress'] = _parser_url_count(1);
     $context['sandbox']['entity_ids'] = array();
     $context['sandbox']['created_entities'] = 0;
     $context['sandbox']['element'] = NULL;
@@ -615,7 +626,7 @@ function parser_parse($job, $redirect, &$context) {
   $GLOBALS['parser']['sleep'] = $job->sleep;
   
   $url = _parser_url_get_not_parsed();
-  $page_url = $url->url;
+  $page_url = $GLOBALS['parser']['url'] = $url->url;
   $page_url_parsed = parse_url($page_url);
   $page = _parser_get_page_by_url($page_url, $job->headers, $job->site_charset, $job->force_download);
   $doc = _parser_create_phpquery($page, $job->charset_fix);
@@ -715,7 +726,7 @@ function parser_parse($job, $redirect, &$context) {
       $field_is_multi_value = ($property_is_field && $field_info['cardinality'] != 1);
       
       // Prepare fields
-      if ($property_is_field && $result) {
+      if ($property_is_field && $result !== NULL) {
         $function = '_parser_prepare_field_' . $field_info['type'];
         if (function_exists($function)) {
           if ($field_is_multi_value) {
@@ -800,8 +811,7 @@ function parser_parse($job, $redirect, &$context) {
   ';
   if ($new_watchdog_row_count) {
     $last_watchdog_message = _parser_get_last_watchdog_message();
-    $last_watchdog_message_time = format_date($last_watchdog_message->timestamp, 'custom', 'H:i:s');
-    $context['message'] .= 'Последнее сообщение: <em>(' . $last_watchdog_message_time . ') ' . check_plain($last_watchdog_message->message) . '</em><br />';
+    $context['message'] .= 'Последнее сообщение: (' . $last_watchdog_message->time . ') ' . $last_watchdog_message->message . '<br />';
   }
 
   if ($job->parse_limit && $context['sandbox']['created_entities'] >= $job->parse_limit) {
@@ -1568,11 +1578,13 @@ function _parser_set_property($entity_wrapper, $property_name, $property_value, 
  */
 function _parser_watchdog($text, $object = NULL, $severity = WATCHDOG_NOTICE) {
   if ($object !== NULL) {
-    watchdog('parser', $text . '<br />Value:<pre>' . check_plain(print_r($object, TRUE)) . '</pre>', NULL, $severity);
+    $text .= '<br />Value:<pre>' . check_plain(print_r($object, TRUE)) . '</pre>';
   }
-  else {
-    watchdog('parser', $text, NULL, $severity);
+  if (!empty($GLOBALS['parser']['url'])) {
+    $text .= '<br />Remote URL: ' . $GLOBALS['parser']['url'];
   }
+
+  watchdog('parser', $text, NULL, $severity);
 }
 
 /**
@@ -1698,10 +1710,13 @@ function _parser_get_headers_array($headers) {
  * Return last watchdog message.
  */
 function _parser_get_last_watchdog_message() {
-  return  db_select('watchdog', 'w')
-    ->fields('w', array('message', 'timestamp'))
+  $message = db_select('watchdog', 'w')
+    ->fields('w', array('wid', 'message', 'variables', 'timestamp'))
     ->orderBy('w.wid', 'DESC')
     ->range(0, 1)
     ->execute()
     ->fetch();
+  $message->message = theme('dblog_message', array('event' => $message));
+  $message->time = format_date($message->timestamp, 'custom', 'H:i:s');
+  return $message;
 }

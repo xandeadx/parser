@@ -49,14 +49,21 @@ function _parser_prepare_field_text_with_summary(&$result, $field_info, $field_i
  */
 function _parser_prepare_field_taxonomy_term_reference(&$result, $field_info, $field_instance, $entity, $job, $base_url) {
   if (is_string($result)) {
+    $term_name = trim($result);
+    
+    if (!$term_name) {
+      $result = NULL;
+      return;
+    }
+
     $voc_machine_name = $field_info['settings']['allowed_values'][0]['vocabulary'];
     $vid = taxonomy_vocabulary_machine_name_load($voc_machine_name)->vid;
-    $term_name = trim($result);
     $term = parser_get_term_by_name($term_name, $vid);
     if (!$term) {
       $term = (object)array('vid' => $vid, 'name' => $term_name);
       taxonomy_term_save($term);
     }
+
     $result = $term->tid;
   }
 }
@@ -83,6 +90,7 @@ function _parser_prepare_field_file(&$result, $field_info, $field_instance, $ent
   $file_url = parser_get_absolute_url($base_url, $result['file']);
   $file_name = drupal_basename($file_url);
   $file_ext = pathinfo($file_name, PATHINFO_EXTENSION);
+  $file_ext = drupal_strtolower($file_ext);
   if (function_exists('transliteration_clean_filename')) {
     $file_name = transliteration_clean_filename($file_name);
   }

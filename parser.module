@@ -359,10 +359,12 @@ function parser_job_form($form, &$form_state, $job) {
     '#value' => 'Сохранить и Начать',
   );
   
-  $form['actions']['submit_and_resume'] = array(
-    '#type' => 'submit',
-    '#value' => 'Сохранить и Продолжить',
-  );
+  if (_parser_url_count(0)) {
+    $form['actions']['submit_and_resume'] = array(
+      '#type' => 'submit',
+      '#value' => 'Сохранить и Продолжить',
+    );
+  }
   
   _parser_set_rows($form);
   
@@ -796,22 +798,27 @@ function parser_parse($job, $redirect, &$context) {
   $context['sandbox']['max'] = _parser_url_count();
   $context['results'] = $GLOBALS['parser']['stat'];
   
+  // Statistics
   $new_watchdog_row_count = _parser_get_watchdog_rows_count() - $context['results']['messages_count'];
-  $context['message'] = '
-    Завершён парсинг страницы глубиной ' . $url->depth . ' <em>' . $page_url . '</em><br />
-    Обработано страниц: ' . $context['sandbox']['progress'] . '<br />
-    Страниц в очереди: ' . ($context['sandbox']['max'] - $context['sandbox']['progress']) . '<br />
-    Создано сущностей: ' . $context['results']['created_entities'] . '<br />
-    Обновлено сущностей: ' . $context['results']['updated_entities'] . '<br />
-    Скачано url: ' . $context['results']['files_from_http'] . '<br />
-    Не удалось скачать url: ' . $context['results']['files_from_http_error'] . '<br />
-    URL взято из кэша: ' . $context['results']['files_from_cache'] . '<br />
-    Затраченное время: ' . gmdate('H:i:s', time() - $context['results']['time_start']) . '<br />
-    Новых сообщений в системном журнале: ' . $new_watchdog_row_count . '<br />
-  ';
+  $messages = array(
+    'Последняя обработанная страница' => '(' . $url->depth . ') ' . $page_url,
+    'Обработано страниц'              => $context['sandbox']['progress'],
+    'Страниц в очереди'               => ($context['sandbox']['max'] - $context['sandbox']['progress']),
+    'Создано сущностей'               => $context['results']['created_entities'],
+    'Обновлено сущностей'             => $context['results']['updated_entities'],
+    'Скачано url'                     => $context['results']['files_from_http'],
+    'Не удалось скачать url'          => $context['results']['files_from_http_error'],
+    'URL взято из кэша'               => $context['results']['files_from_cache'],
+    'Затрачено времени'               => gmdate('H:i:s', time() - $context['results']['time_start']),
+    'Новых сообщений в watchdog'      => $new_watchdog_row_count,
+  );
   if ($new_watchdog_row_count) {
     $last_watchdog_message = _parser_get_last_watchdog_message();
-    $context['message'] .= 'Последнее сообщение: (' . $last_watchdog_message->time . ') ' . $last_watchdog_message->message . '<br />';
+    $messages['Последнее сообщение'] = '(' . $last_watchdog_message->time . ') ' . $last_watchdog_message->message;
+  }
+  $context['message'] = '<style>.message span { font-weight:normal; }</style>';
+  foreach ($messages as $key => $value) {
+    $context['message'] .= $key . ': <span>' . $value . '</span><br />';
   }
 
   if ($job->parse_limit && $context['sandbox']['created_entities'] >= $job->parse_limit) {
@@ -836,7 +843,8 @@ function parser_finished($success, $results, $operations) {
     Обновлено сущностей: ' . l($results['updated_entities'], 'admin/structure/parser_jobs/results/' . $results['jid']) . '<br />
     Затрачено времени: ' . gmdate('H:i:s', time() - $results['time_start']) . '<br />
     Новых сообщений в системном журнале: ' . l(_parser_get_watchdog_rows_count() - $results['messages_count'], 'admin/reports/dblog') . '<br />
-  ');
+  ', $success ? 'status' : 'error');
+  
   if ($results['redirect']) {
     drupal_goto('admin/structure/parser_jobs/manage/' . $results['jid']);
   }

@@ -185,6 +185,12 @@ function parser_schema() {
         'not null' => TRUE,
         'default' => 0,
       ),
+      'jid' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
     ),
     'indexes' => array(
       'url' => array(
@@ -476,4 +482,20 @@ function parser_update_7213() {
     'type' => 'text',
   ));
   drupal_flush_all_caches();
+}
+
+/**
+ * Add new col to {parser_urls} and delete urls with jid=0
+ */
+function parser_update_7214() {
+  db_add_field('parser_urls', 'jid', array(
+    'type' => 'int',
+    'unsigned' => TRUE,
+    'not null' => TRUE,
+    'default' => 0,
+  ));
+  
+  db_delete('parser_urls')
+    ->condition('jid', 0)
+    ->execute();
 }

@@ -359,7 +359,7 @@ function parser_job_form($form, &$form_state, $job) {
     '#value' => 'Сохранить и Начать',
   );
   
-  if (_parser_url_count(0)) {
+  if (!empty($job->jid) && _parser_url_count($job->jid, 0)) {
     $form['actions']['submit_and_resume'] = array(
       '#type' => 'submit',
       '#value' => 'Сохранить и Продолжить',
@@ -583,8 +583,8 @@ function parser_run_batch($job, $redirect = FALSE, $resume = FALSE) {
   }
   
   if (!$resume) {
-    _parser_url_delete_all();
-    _parser_url_add($job->start_url);
+    _parser_url_delete_all($job->jid);
+    _parser_url_add($job->start_url, $job->jid);
   }
 
   if (!empty($job->clear_watchdog)) {
@@ -608,7 +608,7 @@ function parser_parse($job, $redirect, &$context) {
   drupal_set_time_limit(0);
   
   if (empty($context['sandbox'])) {
-    $context['sandbox']['progress'] = _parser_url_count(1);
+    $context['sandbox']['progress'] = _parser_url_count($job->jid, 1);
     $context['sandbox']['entity_ids'] = array();
     $context['sandbox']['created_entities'] = 0;
     $context['sandbox']['element'] = NULL;
@@ -627,7 +627,7 @@ function parser_parse($job, $redirect, &$context) {
   $GLOBALS['parser']['stat'] = $context['results'];
   $GLOBALS['parser']['sleep'] = $job->sleep;
   
-  $url = _parser_url_get_not_parsed();
+  $url = _parser_url_get_not_parsed($job->jid);
   $page_url = $GLOBALS['parser']['url'] = $url->url;
   $page_url_parsed = parse_url($page_url);
   $page = _parser_get_page_by_url($page_url, $job->headers, $job->site_charset, $job->force_download);
@@ -664,7 +664,7 @@ function parser_parse($job, $redirect, &$context) {
         continue;
       }
 
-      _parser_url_add($href_full, $url->depth + 1, $page_url, $href);
+      _parser_url_add($href_full, $job->jid, $url->depth + 1, $page_url, $href);
     }
   }
 
@@ -790,12 +790,12 @@ function parser_parse($job, $redirect, &$context) {
   }
   
   if (!$elements || $context['sandbox']['element'] >= count($elements) - 1) {
-    _parser_url_mark_parsed($page_url);
+    _parser_url_mark_parsed($page_url, $job->jid);
     $context['sandbox']['progress']++;
     $context['sandbox']['element'] = NULL;
   }
 
-  $context['sandbox']['max'] = _parser_url_count();
+  $context['sandbox']['max'] = _parser_url_count($job->jid);
   $context['results'] = $GLOBALS['parser']['stat'];
   
   // Statistics
@@ -835,7 +835,7 @@ function parser_parse($job, $redirect, &$context) {
 function parser_finished($success, $results, $operations) {
   drupal_set_message('
     ' . ($success ? 'Парсинг завершён' : 'Парсинг завершён с ошибками') . '.<br />
-    Обработано страниц: ' . _parser_url_count(TRUE) . '<br />
+    Обработано страниц: ' . _parser_url_count($results['jid'], 1) . '<br />
     Скачано URL: ' . $results['files_from_http'] . '<br />
     URL взято из кэша: ' . $results['files_from_cache'] . '<br />
     Не удалось скачать URL: ' . $results['files_from_http_error'] . '<br />
@@ -1273,10 +1273,11 @@ function parser_get_entity_id_from_feeds_items($importer_name, $guid) {
 /**
  * Get URL info
  */
-function _parser_url_get($url) {
+function _parser_url_get($url, $jid) {
   return db_select('parser_urls', 'pu')
     ->fields('pu')
-    ->condition('url', $url)
+    ->condition('pu.url', $url)
+    ->condition('pu.jid', $jid)
     ->execute()
     ->fetchObject();
 }
@@ -1284,10 +1285,11 @@ function _parser_url_get($url) {
 /**
  * Get first not parsed URL info
  */
-function _parser_url_get_not_parsed() {
+function _parser_url_get_not_parsed($jid) {
   return db_select('parser_urls', 'pu')
     ->fields('pu')
-    ->condition('parsed', 0)
+    ->condition('pu.jid', $jid)
+    ->condition('pu.parsed', 0)
     ->range(0, 1)
     ->execute()
     ->fetchObject();
@@ -1296,11 +1298,12 @@ function _parser_url_get_not_parsed() {
 /**
  * Adding URL to database
  */
-function _parser_url_add($url, $depth = 0, $page_url = '', $href = '') {
-  if (!_parser_url_get($url) && strpos($url, 'xandeadx.ru') === FALSE) {
+function _parser_url_add($url, $jid, $depth = 0, $page_url = '', $href = '') {
+  if (!_parser_url_get($url, $jid) && strpos($url, 'xandeadx.ru') === FALSE) {
     db_insert('parser_urls')
       ->fields(array(
         'url' => $url,
+        'jid' => $jid,
         'depth' => $depth,
         'page_url' => $page_url,
         'href' => $href,
@@ -1312,25 +1315,29 @@ function _parser_url_add($url, $depth = 0, $page_url = '', $href = '') {
 /**
  * Mark URL as parsed
  */
-function _parser_url_mark_parsed($url) {
+function _parser_url_mark_parsed($url, $jid) {
   db_update('parser_urls')
     ->fields(array('parsed' => 1))
     ->condition('url', $url)
+    ->condition('jid', $jid)
     ->execute();
 }
 
 /**
  * Delete all URLs from database
  */
-function _parser_url_delete_all() {
-  db_truncate('parser_urls')->execute();
+function _parser_url_delete_all($jid) {
+  db_delete('parser_urls')
+    ->condition('jid', $jid)
+    ->execute();
 }
 
 /**
  * Get count not parsed URLs
  */
-function _parser_url_count($parsed = NULL) {
-  $query = db_select('parser_urls', 'pu');
+function _parser_url_count($jid, $parsed = NULL) {
+  $query = db_select('parser_urls', 'pu')
+    ->condition('pu.jid', $jid);
   if ($parsed !== NULL) {
     $query->condition('pu.parsed', $parsed);
   }

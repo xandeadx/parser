@@ -12,6 +12,13 @@ function parser_menu() {
     'type' => MENU_CALLBACK,
   );
   
+  $items['parser/redirect/%/%'] = array(
+    'page callback' => 'parser_redirect',
+    'page arguments' => array(2, 3),
+    'access arguments' => array('administer site configuration'),
+    'type' => MENU_CALLBACK,
+  );
+  
   $items['admin/structure/parser_jobs/results/%parser_job'] = array(
     'title' => 'Parser results',
     'page callback' => 'parser_result_page',
@@ -880,7 +887,7 @@ function parser_entity_view($entity, $entity_type, $view_mode, $langcode) {
     $url = _parser_get_url_by_entity_id($entity_type, $entity_id);
     if ($url) {
       $entity->content['parser_url'] = array(
-        '#markup' => '<p>Контент спарсен со страницы ' . l($url, 'http://anonym.to/?' . $url, array('attributes' => array('target' => '_blank'))) . '</p>', 
+        '#markup' => '<p>Контент спарсен со страницы ' . _parser_get_external_link($url) . '</p>', 
         '#weight' => 100, 
       );
     }
@@ -920,6 +927,15 @@ function parser_check_code() {
 }
 
 /**
+ * Menu callback. Redirect to entity page
+ */
+function parser_redirect($entity_type, $entity_id) {
+  $entity = current(entity_load($entity_type, array($entity_id)));
+  $uri = entity_uri($entity_type, $entity);
+  drupal_goto($uri['path'], $uri['options']);
+}
+
+/**
  * Result page
  */
 function parser_result_page($job) {
@@ -936,15 +952,12 @@ function parser_result_page($job) {
   
   $rows = array();
   foreach ($query->execute() as $i => $row) {
-    $entity = current(entity_load($job->entity_type, array($row->entity_id)));
-    $uri = entity_uri($job->entity_type, $entity);
-    
     $rows[] = array(
       $i + 1,
-      l($row->entity_id, $uri['path'], $uri['options']),
+      l($row->entity_id, 'parser/redirect/' . $job->entity_type . '/' . $row->entity_id, array('alias' => TRUE)),
       $row->remote_id,
       $label_key ? $row->{$label_key} : '',
-      l($row->url, $row->url),
+      _parser_get_external_link($row->url),
     );
   }
   
@@ -1734,4 +1747,14 @@ function _parser_get_last_watchdog_message() {
   $message->message = theme('dblog_message', array('event' => $message));
   $message->time = format_date($message->timestamp, 'custom', 'H:i:s');
   return $message;
+}
+
+/**
+ * Return link to external site.
+ */
+function _parser_get_external_link($url) {
+  return l($url, 'http://anonym.to/?' . $url, array(
+    'external' => TRUE,
+    'attributes' => array('target' => '_blank'),
+  ));
 }

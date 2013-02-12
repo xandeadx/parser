@@ -580,7 +580,7 @@ function parser_job_form_submit(&$form, &$form_state) {
   }
   // Save and Run
   elseif ($form_state['clicked_button']['#value'] == $form_state['values']['submit_and_start']) {
-    parser_run_batch($job, request_path() == 'admin/structure/parser_jobs/add');
+    parser_run_batch($job, request_path() == 'admin/structure/parser_jobs/add' || arg(5) == 'clone');
   }
   // Save and Resume
   elseif ($form_state['clicked_button']['#value'] == $form_state['values']['submit_and_resume']) {
@@ -591,7 +591,7 @@ function parser_job_form_submit(&$form, &$form_state) {
 /**
  * Init batch
  */
-function parser_run_batch($job, $redirect = FALSE, $resume = FALSE) {
+function parser_run_batch($job, $redirect_to_job = FALSE, $resume = FALSE) {
   if (is_numeric($job)) {
     $job = parser_job_load($job);
   }
@@ -609,7 +609,7 @@ function parser_run_batch($job, $redirect = FALSE, $resume = FALSE) {
     'title' => 'Парсинг',
     'progress_message' => '',
     'operations' => array(
-      array('parser_parse', array($job, $redirect)),
+      array('parser_parse', array($job, $redirect_to_job)),
     ),
     'finished' => 'parser_finished',
   ));
@@ -618,7 +618,7 @@ function parser_run_batch($job, $redirect = FALSE, $resume = FALSE) {
 /**
  * Parse page
  */
-function parser_parse($job, $redirect, &$context) {
+function parser_parse($job, $redirect_to_job, &$context) {
   drupal_set_time_limit(0);
   
   if (empty($context['sandbox'])) {
@@ -634,7 +634,7 @@ function parser_parse($job, $redirect, &$context) {
     $context['results']['files_from_http'] = 0;
     $context['results']['files_from_http_error'] = 0;
     $context['results']['files_from_cache'] = 0;
-    $context['results']['redirect'] = $redirect;
+    $context['results']['redirect_to_job'] = $redirect_to_job;
     $context['results']['messages_count'] = _parser_get_watchdog_rows_count();
   }
   
@@ -859,7 +859,7 @@ function parser_finished($success, $results, $operations) {
     Новых сообщений в системном журнале: ' . l(_parser_get_watchdog_rows_count() - $results['messages_count'], 'admin/reports/dblog') . '<br />
   ', $success ? 'status' : 'error');
   
-  if ($results['redirect']) {
+  if ($results['redirect_to_job']) {
     drupal_goto('admin/structure/parser_jobs/manage/' . $results['jid']);
   }
 }

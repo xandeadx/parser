@@ -511,6 +511,13 @@ function _parser_job_form_advanced_settings($job, $check_button) {
     '#default_value' => isset($job->headers) ? $job->headers : 'User-Agent: Opera/9.80 (Windows NT 6.1; U; ru) Presto/2.8.131 Version/11.10' . "\n",
   );
   
+  $form['advanced_settings']['proxies'] = array(
+    '#type' => 'value',
+    '#title' => 'Прокси',
+    '#description' => '',
+    '#value' => '',
+  );
+  
   $form['advanced_settings']['clear_watchdog'] = array(
     '#type' => 'checkbox',
     '#title' => 'Очистить системный журнал',

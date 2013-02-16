@@ -141,7 +141,10 @@ function parser_job_form($form, &$form_state, $job) {
   $form['start_url'] = array(
     '#type' => 'textfield',
     '#title' => 'Стартовый URL',
-    '#description' => 'Адрес, с которого парсер начнёт работу. Пример заполнения: <code>http://drupal.org/project/modules</code>',
+    '#description' => '
+      Адрес, с которого парсер начнёт работу. Пример заполнения: <code>http://drupal.org/project/modules</code><br />
+      В адресе можно использовать маску для числовых значений в формате <code>[mask:min,max]</code>, например: <code>http://drupal.org/project/modules?page=[mask:0,890]</code>
+    ',
     '#required' => TRUE,
     '#default_value' => isset($job->start_url) ? $job->start_url : '',
     '#maxlength' => 255,
@@ -598,7 +601,16 @@ function parser_run_batch($job, $redirect_to_job = FALSE, $resume = FALSE) {
   
   if (!$resume) {
     _parser_url_delete_all($job->jid);
-    _parser_url_add($job->start_url, $job->jid);
+    
+    if (preg_match('#\[mask:(\d+),(\d+)\]#', $job->start_url, $matches)) {
+      for ($i = $matches[1]; $i <= $matches[2]; $i++) {
+        $start_url = str_replace('[mask:' . $matches[1] . ',' . $matches[2] . ']', $i, $job->start_url);
+        _parser_url_add($start_url, $job->jid);
+      }
+    }
+    else {
+      _parser_url_add($job->start_url, $job->jid);
+    }
   }
 
   if (!empty($job->clear_watchdog)) {

@@ -295,7 +295,7 @@ function parser_job_form($form, &$form_state, $job) {
     $this_property_is_field = isset($property_info['field']);
     $this_property_is_multi_value = ($this_property_is_field && $fields_info[$property_name]['cardinality'] != 1);
     
-    if ($this_property_is_field && !empty($fields_instances[$property_name])) {
+    if ($this_property_is_field && empty($fields_instances[$property_name])) {
       continue;
     }
     
@@ -342,9 +342,7 @@ function parser_job_form($form, &$form_state, $job) {
       $techical_info = kprint_r($property_info, TRUE, 'entity_get_property_info()');
       if ($this_property_is_field) {
         $techical_info .= kprint_r($fields_info[$property_name], TRUE, 'field_info_fields()');
-        if (!empty($fields_instances[$property_name])) {
-          $techical_info .= kprint_r($fields_instances[$property_name], TRUE, 'field_info_instances()');
-        }
+        $techical_info .= kprint_r($fields_instances[$property_name], TRUE, 'field_info_instances()');
       }
     }
     else {

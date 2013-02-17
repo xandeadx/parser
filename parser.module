@@ -295,6 +295,10 @@ function parser_job_form($form, &$form_state, $job) {
     $this_property_is_field = isset($property_info['field']);
     $this_property_is_multi_value = ($this_property_is_field && $fields_info[$property_name]['cardinality'] != 1);
     
+    if ($this_property_is_field && !$fields_instances[$property_name]) {
+      continue;
+    }
+    
     $form['fields_wrapper']['fields_code'][$fieldset_name] = array(
       '#type' => 'fieldset',
       '#title' => $property_info['label'] . ' (' . $property_name . ')' . (!empty($property_info['required']) ? ' *' : ''),
@@ -1642,7 +1646,7 @@ function _parser_get_entity_properties($entity_type, $bundle) {
   $entity_properties = isset($entity_properties_and_fields['properties'])
     ? $entity_properties_and_fields['properties']
     : array();
-  $entity_properties_fields = isset($entity_properties_and_fields['bundles'])
+  $entity_properties_fields = isset($entity_properties_and_fields['bundles'][$bundle]['properties'])
     ? $entity_properties_and_fields['bundles'][$bundle]['properties']
     : array();
   return array($entity_properties, $entity_properties_fields);

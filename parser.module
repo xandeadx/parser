@@ -1639,7 +1639,9 @@ function _parser_watchdog($text, $object = NULL, $severity = WATCHDOG_NOTICE) {
  */
 function _parser_get_entity_properties($entity_type, $bundle) {
   $entity_properties_and_fields = entity_get_property_info($entity_type);
-  $entity_properties = $entity_properties_and_fields['properties'];
+  $entity_properties = isset($entity_properties_and_fields['properties'])
+    ? $entity_properties_and_fields['properties']
+    : array();
   $entity_properties_fields = isset($entity_properties_and_fields['bundles'])
     ? $entity_properties_and_fields['bundles'][$bundle]['properties']
     : array();

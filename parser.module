@@ -418,7 +418,7 @@ function _parser_job_form_advanced_settings($job, $check_button) {
   $form['advanced_settings']['site_charset'] = array(
     '#type' => 'select',
     '#title' => 'Кодировка сайта',
-    '#description' => 'Выберите кодировку, которая используется на удалённом сайте. Рекомендуется автоопределение.',
+    '#description' => 'Выберите кодировку, которая используется на сайте источнике. Рекомендуется автоопределение.',
     '#options' => array('auto' => 'Автоопределение', 'UTF-8' => 'UTF-8', 'WINDOWS-1251' => 'WINDOWS-1251'),
     '#default_value' => isset($job->site_charset) ? $job->site_charset : 'auto',
   );

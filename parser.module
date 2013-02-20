@@ -322,7 +322,7 @@ function parser_job_form($form, &$form_state, $job) {
     
     $form['fields_wrapper']['fields_code'][$fieldset_name][$property_name] = array(
       '#type' => 'textarea',
-      '#title' => 'PHP код',
+      '#title' => 'PHP код для поля ' . $property_info['label'],
       '#description' => $description,
       '#default_value' => isset($fields_code[$property_name]) ? $fields_code[$property_name] : '',
       '#rows' => 3,

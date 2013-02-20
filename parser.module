@@ -660,7 +660,7 @@ function parser_parse($job, $redirect_to_job, &$context) {
   $url = _parser_url_get_not_parsed($job->jid);
   $page_url = $GLOBALS['parser']['url'] = $url->url;
   $page_url_parsed = parse_url($page_url);
-  $page = _parser_get_page_by_url($page_url, $job->headers, $job->site_charset, $job->force_download);
+  $page = _parser_get_page_by_url($page_url, $job->headers, $job->site_charset, $job->force_download && !$context['sandbox']['element']);
   $doc = _parser_create_phpquery($page, $job->charset_fix);
   $base = $doc->find('base')->attr('href');
   $base_url = $base ? $base : $page_url;

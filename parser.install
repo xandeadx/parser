@@ -167,16 +167,6 @@ function parser_schema() {
         'size' => 'normal',
         'not null' => TRUE,
       ),
-      'page_url' => array(
-        'type' => 'text',
-        'size' => 'normal',
-        'not null' => TRUE,
-      ),
-      'href' => array(
-        'type' => 'text',
-        'size' => 'normal',
-        'not null' => TRUE,
-      ),
       'depth' => array(
         'type' => 'int',
         'unsigned' => TRUE,
@@ -504,4 +494,12 @@ function parser_update_7214() {
   db_delete('parser_urls')
     ->condition('jid', 0)
     ->execute();
+}
+
+/**
+ * Remove cols from `parser_urls`
+ */
+function parser_update_7215() {
+  db_drop_field('parser_urls', 'page_url');
+  db_drop_field('parser_urls', 'href');
 }

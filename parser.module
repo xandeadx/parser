@@ -694,7 +694,7 @@ function parser_parse($job, $redirect_to_job, &$context) {
         continue;
       }
 
-      _parser_url_add($href_full, $job->jid, $url->depth + 1, $page_url, $href);
+      _parser_url_add($href_full, $job->jid, $url->depth + 1);
     }
   }
 
@@ -1334,15 +1334,13 @@ function _parser_url_get_not_parsed($jid) {
 /**
  * Adding URL to database
  */
-function _parser_url_add($url, $jid, $depth = 0, $page_url = '', $href = '') {
+function _parser_url_add($url, $jid, $depth = 0) {
   if (!_parser_url_get($url, $jid) && strpos($url, 'xandeadx.ru') === FALSE) {
     db_insert('parser_urls')
       ->fields(array(
         'url' => $url,
         'jid' => $jid,
         'depth' => $depth,
-        'page_url' => $page_url,
-        'href' => $href,
       ))
       ->execute();
   }

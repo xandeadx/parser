@@ -157,6 +157,11 @@ function parser_schema() {
   
   $schema['parser_urls'] = array(
     'fields' => array(
+      'uid' => array(
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
       'url' => array(
         'type' => 'text',
         'size' => 'normal',
@@ -192,6 +197,7 @@ function parser_schema() {
         'default' => 0,
       ),
     ),
+    'primary key' => array('uid'),
     'indexes' => array(
       'url' => array(
         array('url', 100),

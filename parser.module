@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Implements hook_menu()
+ * Implements hook_menu().
  */
 function parser_menu() {
   $items = array();
@@ -47,7 +47,7 @@ function parser_menu() {
 }
 
 /**
- * Implements hook_entity_info()
+ * Implements hook_entity_info().
  */
 function parser_entity_info() {
   return array(
@@ -72,14 +72,14 @@ function parser_entity_info() {
 }
 
 /**
- * Check acces rights
+ * Check acces rights.
  */
 function parser_job_access($op, $entity, $account = NULL, $entity_type = 'parser_job') {
   return user_access('administer site configuration');
 }
  
 /**
- * Load entity object by id
+ * Load entity object by id.
  */
 function parser_job_load($jid) {
   $result = entity_load('parser_job', array($jid));
@@ -87,14 +87,14 @@ function parser_job_load($jid) {
 }
 
 /**
- * Parser job uri callback
+ * Parser job uri callback.
  */
 function parser_job_uri($job) {
   return array('path' => 'admin/structure/parser_jobs/manage/' . $job->jid);
 }
 
 /**
- * Job form
+ * Job form.
  */
 function parser_job_form($form, &$form_state, $job) {
   $check_button = array('#field_prefix' => '<input type="button" value="проверить" class="form-submit check-button" />');
@@ -219,7 +219,7 @@ function parser_job_form($form, &$form_state, $job) {
     '#default_value' => isset($job->entity_type) ? $job->entity_type : 'node',
     '#required' => TRUE,
     '#ajax' => array('callback' => 'parser_job_form_entity_type_ajax_callback'),
-    '#disabled' => isset($job->jid) && db_select('parser_map')->condition('jid', $job->jid)->countQuery()->execute()->fetchField() ? TRUE : FALSE,
+    '#disabled' => isset($job->jid) && _parser_get_entity_count($job->jid) ? TRUE : FALSE,
   );
   
   // Bundle
@@ -392,7 +392,7 @@ function parser_job_form($form, &$form_state, $job) {
 }
 
 /**
- * Advanced settings sub-form
+ * Advanced settings sub-form.
  */
 function _parser_job_form_advanced_settings($job, $check_button) {
   $form['advanced_settings'] = array(
@@ -536,7 +536,7 @@ function _parser_job_form_advanced_settings($job, $check_button) {
 }
 
 /**
- * Ajax callback
+ * Ajax callback.
  */
 function parser_job_form_entity_type_ajax_callback($form, $form_state) {
   return array(
@@ -549,14 +549,14 @@ function parser_job_form_entity_type_ajax_callback($form, $form_state) {
 }
 
 /**
- * Ajax callback
+ * Ajax callback.
  */
 function parser_job_form_fields_ajax_callback($form, $form_state) {
   return $form['fields_wrapper'];
 }
 
 /**
- * Job form submit callback
+ * Job form submit callback.
  */
 function parser_job_form_submit(&$form, &$form_state) {
   $clicked_button = $form_state['clicked_button']['#value'];
@@ -596,7 +596,7 @@ function parser_job_form_submit(&$form, &$form_state) {
 }
 
 /**
- * Init batch
+ * Init batch.
  */
 function parser_run_batch($job, $redirect_to_job = FALSE, $resume = FALSE) {
   if (is_numeric($job)) {
@@ -632,7 +632,7 @@ function parser_run_batch($job, $redirect_to_job = FALSE, $resume = FALSE) {
 }
 
 /**
- * Parse page
+ * Parse page.
  */
 function parser_parse($job, $redirect_to_job, &$context) {
   drupal_set_time_limit(0);
@@ -669,6 +669,7 @@ function parser_parse($job, $redirect_to_job, &$context) {
   if ($job->list_mode_code) {
     $elements = eval($job->list_mode_code);
     if ($elements) {
+      $elements = array_values($elements); // Re-numbered elements
       $context['sandbox']['element'] = ($context['sandbox']['element'] === NULL) ? 0 : $context['sandbox']['element'] + 1;
       $element_html = $elements[$context['sandbox']['element']];
       $doc_element = _parser_create_phpquery($element_html, $job->charset_fix);
@@ -704,6 +705,9 @@ function parser_parse($job, $redirect_to_job, &$context) {
     $allowed_parse = FALSE;
   }
   if ($allowed_parse && $job->parse_limit && $context['sandbox']['created_entities'] >= $job->parse_limit) {
+    $allowed_parse = FALSE;
+  }
+  if (is_array($elements) && count($elements) == 0) {
     $allowed_parse = FALSE;
   }
   if ($allowed_parse && $job->check_code) {
@@ -860,7 +864,7 @@ function parser_parse($job, $redirect_to_job, &$context) {
 }
 
 /**
- * Site is parsed
+ * Site is parsed.
  */
 function parser_finished($success, $results, $operations) {
   drupal_set_message('
@@ -882,7 +886,7 @@ function parser_finished($success, $results, $operations) {
 
 /**
  * Implements of hook_entity_delete().
- * Delete record from {parser_map} table
+ * Delete record from {parser_map} table.
  */
 function parser_entity_delete($entity, $entity_type) {
   $entity_id = entity_id($entity_type, $entity);
@@ -950,7 +954,7 @@ function parser_check_code() {
 }
 
 /**
- * Menu callback. Redirect to entity page
+ * Menu callback. Redirect to entity page.
  */
 function parser_redirect($entity_type, $entity_id) {
   $entity = current(entity_load($entity_type, array($entity_id)));
@@ -959,7 +963,7 @@ function parser_redirect($entity_type, $entity_id) {
 }
 
 /**
- * Result page
+ * Result page.
  */
 function parser_result_page($job) {
   $entity_info = entity_get_info($job->entity_type);
@@ -1001,7 +1005,7 @@ function parser_result_page($job) {
 }
 
 /**
- * Rollback form
+ * Rollback form.
  */
 function parser_rollback_form($form, $form_state, $job) {
   $form['jid'] = array(
@@ -1020,7 +1024,7 @@ function parser_rollback_form($form, $form_state, $job) {
 }
 
 /**
- * Rollback form submit callback
+ * Rollback form submit callback.
  */
 function parser_rollback_form_submit($form, &$form_state) {
   $job = parser_job_load($form_state['values']['jid']);
@@ -1041,14 +1045,22 @@ function parser_rollback_form_submit($form, &$form_state) {
 }
 
 /**
- * Implements of hook_form_FORM_ID_alter()
+ * Implements of hook_form_FORM_ID_alter(): parser_job_overview_form.
  */
 function parser_form_parser_job_overview_form_alter(&$form, $form_state) {
   $form['table']['#header'][2]['colspan'] = 6;
   
   foreach ($form['table']['#rows'] as &$row) {
-    $row[] = l(t('results'), 'admin/structure/parser_jobs/results/' . $row[0]['data']['#name']);
-    $row[] = l(t('rollback'), 'admin/structure/parser_jobs/rollback/' . $row[0]['data']['#name']);
+    $jid = $row[0]['data']['#name'];
+    $entity_count = _parser_get_entity_count($jid);
+    
+    $row[] = l(t('results'), 'admin/structure/parser_jobs/results/' . $jid);
+    if ($entity_count > 0) {
+      $row[] = l(t('rollback') . ' (' . $entity_count . ')', 'admin/structure/parser_jobs/rollback/' . $jid);
+    }
+    else {
+      $row[] = '';
+    }
   }
 }
 
@@ -1099,7 +1111,7 @@ function parser_settings_form($form) {
 }
 
 /**
- * Return entity id by URL
+ * Return entity id by URL.
  */
 function parser_get_entity_id_by_url($url, $jid = NULL, $element = NULL) {
   $query = db_select('parser_map', 'pn')
@@ -1122,7 +1134,7 @@ function parser_get_entity_id_by_url($url, $jid = NULL, $element = NULL) {
 }
 
 /**
- * Return entity id by Page Key
+ * Return entity id by Page Key.
  */
 function parser_get_entity_id_by_remote_id($remote_id, $jid = NULL) {
   $query = db_select('parser_map', 'pn')
@@ -1138,7 +1150,7 @@ function parser_get_entity_id_by_remote_id($remote_id, $jid = NULL) {
 }
 
 /**
- * Implements hook_entity_property_info_alter()
+ * Implements hook_entity_property_info_alter().
  */
 function parser_entity_property_info_alter(&$info) {
   foreach ($info as $entity_type => $properties) {
@@ -1159,7 +1171,7 @@ function parser_entity_property_info_alter(&$info) {
 }
 
 /**
- * Set setter callback for 'format' property
+ * Set setter callback for 'format' property.
  */
 function _parser_set_format_setter_callback(&$property_info) {
   if (
@@ -1173,7 +1185,7 @@ function _parser_set_format_setter_callback(&$property_info) {
 }
 
 /**
- * Find files in html, download and change tag attribute
+ * Find files in html, download and change tag attribute.
  */
 function _parser_download_files($html, $selector, $attr, $base_url, $path = 'public://') {
   $doc = _parser_create_phpquery($html);
@@ -1208,14 +1220,14 @@ function _parser_download_files($html, $selector, $attr, $base_url, $path = 'pub
 }
 
 /**
- * Find img tag in html, download files and change src attribute
+ * Find img tag in html, download files and change src attribute.
  */
 function parser_download_images($html, $base_url, $path = 'public://images') {
   return _parser_download_files($html, 'img', 'src', $base_url, $path);
 }
 
 /**
- * Find links in html, download files and change href attribute
+ * Find links in html, download files and change href attribute.
  */
 function parser_download_links($html, $extensions, $base_url, $path = 'public://') {
   $selectors = array();
@@ -1226,7 +1238,7 @@ function parser_download_links($html, $extensions, $base_url, $path = 'public://
 }
 
 /**
- * Run job in background
+ * Run job in background.
  */
 function parser_run_in_background($jid) {
   parser_run_batch($jid);
@@ -1307,7 +1319,7 @@ function parser_get_entity_id_from_feeds_items($importer_name, $guid) {
 }
 
 /**
- * Get URL info
+ * Get URL info.
  */
 function _parser_url_get($url, $jid) {
   return db_select('parser_urls', 'pu')
@@ -1319,7 +1331,7 @@ function _parser_url_get($url, $jid) {
 }
 
 /**
- * Get first not parsed URL info
+ * Get first not parsed URL info.
  */
 function _parser_url_get_not_parsed($jid) {
   return db_select('parser_urls', 'pu')
@@ -1332,7 +1344,7 @@ function _parser_url_get_not_parsed($jid) {
 }
 
 /**
- * Adding URL to database
+ * Adding URL to database.
  */
 function _parser_url_add($url, $jid, $depth = 0) {
   if (!_parser_url_get($url, $jid) && strpos($url, 'xandeadx.ru') === FALSE) {
@@ -1347,7 +1359,7 @@ function _parser_url_add($url, $jid, $depth = 0) {
 }
 
 /**
- * Mark URL as parsed
+ * Mark URL as parsed.
  */
 function _parser_url_mark_parsed($url, $jid) {
   db_update('parser_urls')
@@ -1358,7 +1370,7 @@ function _parser_url_mark_parsed($url, $jid) {
 }
 
 /**
- * Delete all URLs from database
+ * Delete all URLs from database.
  */
 function _parser_url_delete_all($jid) {
   db_delete('parser_urls')
@@ -1367,7 +1379,7 @@ function _parser_url_delete_all($jid) {
 }
 
 /**
- * Get count not parsed URLs
+ * Get count not parsed URLs.
  */
 function _parser_url_count($jid, $parsed = NULL) {
   $query = db_select('parser_urls', 'pu')
@@ -1379,7 +1391,7 @@ function _parser_url_count($jid, $parsed = NULL) {
 }
 
 /**
- * Return page html by URL
+ * Return page html by URL.
  */
 function _parser_get_page_by_url($url, $headers = array(), $charset = 'auto', $force_download = FALSE) { 
   $page_cache_uri = _parser_download_url_to_cache($url, $headers, $force_download);
@@ -1407,7 +1419,7 @@ function _parser_get_page_by_url($url, $headers = array(), $charset = 'auto', $f
 }
 
 /**
- * Download remote url to cache and return cache uri
+ * Download remote url to cache and return cache uri.
  */
 function _parser_download_url_to_cache($url, $headers = array(), $force_download = FALSE) {
   $cache_uri = 'public://parser_cache/' . md5($url);
@@ -1448,7 +1460,7 @@ function _parser_download_url_to_cache($url, $headers = array(), $force_download
 }
 
 /**
- * Add row in {parser_map} table
+ * Add row in {parser_map} table.
  */
 function _parser_map_save($record) {
   db_merge('parser_map')
@@ -1463,7 +1475,7 @@ function _parser_map_save($record) {
 }
 
 /**
- * Return URL by entity id
+ * Return URL by entity id.
  */
 function _parser_get_url_by_entity_id($entity_type, $entity_id, $jid = NULL) {
   $query = db_select('parser_map', 'pn');
@@ -1480,7 +1492,7 @@ function _parser_get_url_by_entity_id($entity_type, $entity_id, $jid = NULL) {
 }
 
 /**
- * Return row count
+ * Return row count.
  */
 function _parser_get_rows($text) {
   $count = substr_count(trim($text), "\n") + 1;
@@ -1488,7 +1500,7 @@ function _parser_get_rows($text) {
 }
 
 /**
- * Set row count
+ * Set row count.
  */
 function _parser_set_rows(&$form) {
   foreach (element_children($form) as $element) {
@@ -1502,7 +1514,7 @@ function _parser_set_rows(&$form) {
 }
 
 /**
- * Return absolute url by base and relative url (deprecated)
+ * Return absolute url by base and relative url (deprecated).
  */
 function _parser_get_full_url($relative_url, $base_url) {
   $relative_url = trim($relative_url);
@@ -1536,7 +1548,7 @@ function _parser_get_full_url($relative_url, $base_url) {
 }
 
 /**
- * Return absolute url by base and relative url
+ * Return absolute url by base and relative url.
  */
 function parser_get_absolute_url($base_url, $relative_url) {
   if (!function_exists('url_to_absolute')) {
@@ -1551,7 +1563,7 @@ function parser_get_absolute_url($base_url, $relative_url) {
 }
 
 /**
- * Create phpQuery object
+ * Create phpQuery object.
  */
 function _parser_create_phpquery($html, $charset_fix = FALSE) {
   require_once('phpQuery/phpQuery/phpQuery.php');
@@ -1559,7 +1571,7 @@ function _parser_create_phpquery($html, $charset_fix = FALSE) {
 }
 
 /**
- * Return example field structure
+ * Return example field structure.
  */
 function _parser_get_field_structure($field_info, $spaces = 2) {
   $strucure = '';
@@ -1573,7 +1585,7 @@ function _parser_get_field_structure($field_info, $spaces = 2) {
 }
 
 /**
- * Set entity property
+ * Set entity property.
  */
 function _parser_set_property($entity_wrapper, $property_name, $property_value, $property_is_compound, $property_is_multi_value) {
   // Multi-value compound property
@@ -1623,7 +1635,7 @@ function _parser_set_property($entity_wrapper, $property_name, $property_value, 
 }
 
 /**
- * Add error to watchdog
+ * Add error to watchdog.
  */
 function _parser_watchdog($text, $object = NULL, $severity = WATCHDOG_NOTICE) {
   if ($object !== NULL) {
@@ -1637,7 +1649,7 @@ function _parser_watchdog($text, $object = NULL, $severity = WATCHDOG_NOTICE) {
 }
 
 /**
- * Return entity type properties
+ * Return entity type properties.
  */
 function _parser_get_entity_properties($entity_type, $bundle) {
   $entity_properties_and_fields = entity_get_property_info($entity_type);
@@ -1651,7 +1663,7 @@ function _parser_get_entity_properties($entity_type, $bundle) {
 }
 
 /**
- * Copy file from cache and return file object
+ * Copy file from cache and return file object.
  */
 function _parser_copy_file($from_uri, $to_uri) {
   $file = (object)array(
@@ -1670,7 +1682,7 @@ function _parser_copy_file($from_uri, $to_uri) {
 }
 
 /**
- * Return page links
+ * Return page links.
  */
 function _parser_get_page_links($doc) {
   $links = array();  
@@ -1703,7 +1715,7 @@ function _parser_get_page_links($doc) {
 }
 
 /**
- * Return TRUE if URLs have same host
+ * Return TRUE if URLs have same host.
  */
 function _parser_check_urls_host($url1, $url2) {
   $url1_host = preg_replace('#^www.#', '', parse_url($url1, PHP_URL_HOST));
@@ -1714,7 +1726,7 @@ function _parser_check_urls_host($url1, $url2) {
 }
 
 /**
- * Return options for form element
+ * Return options for form element.
  */
 function _parser_get_entity_type_options($entity_types) {
   $options = array();
@@ -1725,7 +1737,7 @@ function _parser_get_entity_type_options($entity_types) {
 }
 
 /**
- * Return options for form element
+ * Return options for form element.
  */
 function _parser_get_bundle_options($bundles) {
   $options = array();
@@ -1736,14 +1748,14 @@ function _parser_get_bundle_options($bundles) {
 }
 
 /**
- * Return rows count in {watchdog} table
+ * Return rows count in {watchdog} table.
  */
 function _parser_get_watchdog_rows_count() {
   return db_select('watchdog')->countQuery()->execute()->fetchField();
 }
 
 /**
- * Return options for drupal_http_request()
+ * Return options for drupal_http_request().
  */
 function _parser_get_headers_array($headers) {
   $headers_array = array();
@@ -1780,4 +1792,15 @@ function _parser_get_external_link($url) {
     'external' => TRUE,
     'attributes' => array('target' => '_blank'),
   ));
+}
+
+/**
+ * Return entity count in {parser_map} table by jid.
+ */
+function _parser_get_entity_count($jid) {
+  return db_select('parser_map')
+    ->condition('jid', $jid)
+    ->countQuery()
+    ->execute()
+    ->fetchField();
 }

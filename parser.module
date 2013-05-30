@@ -680,8 +680,8 @@ function parser_parse($job, $redirect_to_job, &$context) {
   $entity_type_info = entity_get_info($job->entity_type);
   $remote_id = '';
   
-  if ($url->depth < $job->depth) {
-    // Find links
+  // Find links
+  if ($url->depth < $job->depth && !$context['sandbox']['element']) {
     foreach (_parser_get_page_links($doc) as $href) {
       $href_full = parser_get_absolute_url($base_url, $href);
       

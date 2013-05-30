@@ -665,6 +665,7 @@ function parser_parse($job, $redirect_to_job, &$context) {
   $base = $doc->find('base')->attr('href');
   $base_url = $base ? $base : $page_url;
   
+  // If list mode enabled
   $elements = NULL;
   if ($job->list_mode_code) {
     $elements = eval($job->list_mode_code);
@@ -675,10 +676,6 @@ function parser_parse($job, $redirect_to_job, &$context) {
       $doc_element = _parser_create_phpquery($element_html, $job->charset_fix);
     }
   }
-  
-  $entity_id = parser_get_entity_id_by_url($page_url, $job->jid, $context['sandbox']['element']);
-  $entity_type_info = entity_get_info($job->entity_type);
-  $remote_id = '';
   
   // Find links
   if ($url->depth < $job->depth && !$context['sandbox']['element']) {
@@ -698,6 +695,8 @@ function parser_parse($job, $redirect_to_job, &$context) {
       _parser_url_add($href_full, $job->jid, $url->depth + 1);
     }
   }
+  
+  $entity_id = parser_get_entity_id_by_url($page_url, $job->jid, $context['sandbox']['element']);
 
   // Decide - parse cur page or not
   $allowed_parse = TRUE;
@@ -742,7 +741,8 @@ function parser_parse($job, $redirect_to_job, &$context) {
     }
     // Create entity object
     if (!$entity_id || !$entity) {
-      $entity = entity_create($job->entity_type, array($entity_type_info['entity keys']['bundle'] => $job->bundle));
+      $entity_info = entity_get_info($job->entity_type);
+      $entity = entity_create($job->entity_type, array($entity_info['entity keys']['bundle'] => $job->bundle));
       $GLOBALS['parser']['stat']['created_entities']++;
     }
     
@@ -814,7 +814,7 @@ function parser_parse($job, $redirect_to_job, &$context) {
         'entity_id' => $entity_id,
         'jid' => $job->jid,
         'url' => $page_url,
-        'remote_id' => $remote_id,
+        'remote_id' => isset($remote_id) ? $remote_id : '',
         'element' => $context['sandbox']['element'],
       ));
       

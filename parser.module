@@ -200,7 +200,7 @@ function parser_job_form($form, &$form_state, $job) {
     '#type' => 'textarea',
     '#title' => 'Код проверки для дальнейшего парсинга страницы',
     '#description' => '
-      PHP код без тегов &lt;?php и ?&gt;, который должен вернуть TRUE если страницу нужно парсить в ноду.
+      PHP код без тегов &lt;?php и ?&gt;, который должен вернуть TRUE если страницу нужно парсить в сущность.
       Доступные переменные: $page - html код страницы, $doc - объект phpQuery, $page_url - адрес страницы без учёта редиректов.
       Пример заполнения: <code>return ($doc->find(\'.class-name\')->length() > 0);</code>
     ',
@@ -243,7 +243,7 @@ function parser_job_form($form, &$form_state, $job) {
     '#title' => 'Remote ID',
     '#description' => '
       ID сущности на сайте источнике.
-      Этот ID будет сохранён в бд (таблица parser_map) и позволит избежать дублей материалов, доступных по нескольким URL.
+      Этот ID будет сохранён в бд (таблица parser_map) и позволит избежать дублей сущностей, доступных по нескольким URL.
       Так же, зная этот ID, можно с помощью функции parser_get_entity_id_by_remote_id() получить ID созданной сущности.
       Поле является не обязательным, но крайне рекомендованное к заполнению.
     ',
@@ -443,7 +443,7 @@ function _parser_job_form_advanced_settings($job, $check_button) {
   $form['advanced_settings']['save_url'] = array(
     '#type' => 'checkbox',
     '#title' => 'Сохранять адреса',
-    '#description' => 'Отметьте, если хотите, чтобы у нод были такие же адреса, как на сайте источнике. Не включайте эту опцию если на сайте источнике не используется ЧПУ (т.е. в адресах есть символ "?").',
+    '#description' => 'Отметьте, если хотите, чтобы у сущностей были такие же адреса, как на сайте источнике. Не включайте эту опцию если на сайте источнике не используется ЧПУ (т.е. в адресах есть символ "?").',
     '#default_value' => isset($job->save_url) && module_exists('path') ? $job->save_url : 0,
     '#disabled' => !module_exists('path'),
   );
@@ -1049,11 +1049,12 @@ function parser_form_parser_job_overview_form_alter(&$form, $form_state) {
     $jid = $row[0]['data']['#name'];
     $entity_count = _parser_get_entity_count($jid);
     
-    $row[] = l(t('results'), 'admin/structure/parser_jobs/results/' . $jid);
     if ($entity_count > 0) {
+      $row[] = l(t('results'), 'admin/structure/parser_jobs/results/' . $jid);
       $row[] = l(t('rollback') . ' (' . $entity_count . ')', 'admin/structure/parser_jobs/rollback/' . $jid);
     }
     else {
+      $row[] = '';
       $row[] = '';
     }
   }

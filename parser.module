@@ -783,7 +783,7 @@ function parser_parse($job, $redirect_to_job, &$context) {
     
     // Set Path alias
     if ($job->save_url) {
-      _parser_set_entity_path($page_url);
+      _parser_set_entity_path($entity, $page_url);
     }
     
     // Prepare entity

@@ -82,8 +82,7 @@ function parser_job_access($op, $entity, $account = NULL, $entity_type = 'parser
  * Load entity object by id.
  */
 function parser_job_load($jid) {
-  $result = entity_load('parser_job', array($jid));
-  return $result ? reset($result) : FALSE;
+  return entity_load_single('parser_job', $jid);
 }
 
 /**
@@ -735,7 +734,7 @@ function parser_parse($job, $redirect_to_job, &$context) {
     
     // Load entity
     if ($entity_id) {
-      $entity = current(entity_load($job->entity_type, array($entity_id)));
+      $entity = entity_load_single($job->entity_type, $entity_id);
       $GLOBALS['parser']['stat']['updated_entities']++;
     }
     // Create entity object
@@ -951,7 +950,7 @@ function parser_check_code() {
  * Menu callback. Redirect to entity page.
  */
 function parser_redirect($entity_type, $entity_id) {
-  $entity = current(entity_load($entity_type, array($entity_id)));
+  $entity = entity_load_single($entity_type, $entity_id);
   $uri = entity_uri($entity_type, $entity);
   drupal_goto($uri['path'], $uri['options']);
 }
@@ -1021,6 +1020,8 @@ function parser_rollback_form($form, $form_state, $job) {
  * Rollback form submit callback.
  */
 function parser_rollback_form_submit($form, &$form_state) {
+  drupal_set_time_limit(0);
+  
   $job = parser_job_load($form_state['values']['jid']);
   $deleted_count = 0;
   
@@ -1283,8 +1284,7 @@ function parser_get_entity_by_conditions($entity_type, $properties = NULL, $fiel
   $result = $query->execute();
   if ($result) {
     $id = key($result[$entity_type]);
-    $entities = entity_load($entity_type, array($id));
-    return reset($entities);
+    return entity_load_single($entity_type, $id);
   }
 }
 

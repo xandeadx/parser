@@ -659,7 +659,6 @@ function parser_parse($job, $redirect_to_job, &$context) {
   
   $url = _parser_url_get_not_parsed($job->jid);
   $page_url = $GLOBALS['parser']['url'] = $url->url;
-  $page_url_parsed = parse_url($page_url);
   $page = _parser_get_page_by_url($page_url, $job->headers, $job->site_charset, $job->force_download && !$context['sandbox']['element']);
   $doc = _parser_create_phpquery($page, $job->charset_fix);
   $base = $doc->find('base')->attr('href');
@@ -695,8 +694,6 @@ function parser_parse($job, $redirect_to_job, &$context) {
       _parser_url_add($href_full, $job->jid, $url->depth + 1);
     }
   }
-  
-  $entity_id = parser_get_entity_id_by_url($page_url, $job->jid, $context['sandbox']['element']);
 
   // Decide - parse cur page or not
   $allowed_parse = TRUE;
@@ -712,14 +709,20 @@ function parser_parse($job, $redirect_to_job, &$context) {
   if ($allowed_parse && $job->check_code) {
     $allowed_parse = eval($job->check_code);
   }
-  if ($allowed_parse && $job->remote_id_code) {
-    $remote_id = eval($job->remote_id_code);
-    if ($remote_id) {
-      $entity_id = parser_get_entity_id_by_remote_id($remote_id, $job->jid);
+  if ($allowed_parse) {
+    if ($job->remote_id_code) {
+      $remote_id = eval($job->remote_id_code);
+      if ($remote_id) {
+        $entity_id = parser_get_entity_id_by_remote_id($remote_id, $job->jid);
+      }
     }
-  }
-  if ($allowed_parse && $entity_id && in_array($entity_id, $context['sandbox']['entity_ids'])) {
-    $allowed_parse = FALSE;
+    if (!isset($entity_id)) {
+      $entity_id = parser_get_entity_id_by_url($page_url, $job->jid, $context['sandbox']['element']);
+    }
+    
+    if ($entity_id && in_array($entity_id, $context['sandbox']['entity_ids'])) {
+      $allowed_parse = FALSE;
+    }
   }
   if ($allowed_parse && $job->no_update && $entity_id) {
     $allowed_parse = FALSE;
@@ -730,23 +733,22 @@ function parser_parse($job, $redirect_to_job, &$context) {
     module_load_include('inc', 'parser', 'parser_prepare_field');
     module_load_include('inc', 'parser', 'parser_prepare_entity');
     
-    $fields_info = field_info_fields();
-    $fields_instances = field_info_instances($job->entity_type, $job->bundle);
-    list($entity_properties, $entity_properties_fields) = _parser_get_entity_properties($job->entity_type, $job->bundle);
-    
     // Load entity
     if ($entity_id) {
       $entity = current(entity_load($job->entity_type, array($entity_id)));
       $GLOBALS['parser']['stat']['updated_entities']++;
     }
     // Create entity object
-    if (!$entity_id || !$entity) {
+    if (!isset($entity)) {
       $entity_info = entity_get_info($job->entity_type);
       $entity = entity_create($job->entity_type, array($entity_info['entity keys']['bundle'] => $job->bundle));
       $GLOBALS['parser']['stat']['created_entities']++;
     }
     
     $entity_wrapper = entity_metadata_wrapper($job->entity_type, $entity);
+    $fields_info = field_info_fields();
+    $fields_instances = field_info_instances($job->entity_type, $job->bundle);
+    list($entity_properties, $entity_properties_fields) = _parser_get_entity_properties($job->entity_type, $job->bundle);
     
     // Populate properties and fields
     foreach ($job->fields_code as $property_name => $php_code) {
@@ -781,15 +783,7 @@ function parser_parse($job, $redirect_to_job, &$context) {
     
     // Set Path alias
     if ($job->save_url) {
-      $alias = trim($page_url_parsed['path'], '/');
-      $alias = str_replace('%20', ' ', $alias);
-      if (!path_load(array('alias' => $alias))) {
-        $entity->path = array(
-          'alias' => $alias,
-          'language' => LANGUAGE_NONE,
-          'pathauto' => 0,
-        );
-      }
+      _parser_set_entity_path($page_url);
     }
     
     // Prepare entity
@@ -1803,4 +1797,20 @@ function _parser_get_entity_count($jid) {
     ->countQuery()
     ->execute()
     ->fetchField();
+}
+
+/**
+ * Set entity path.
+ */
+function _parser_set_entity_path(&$entity, $page_url) {
+  $page_url_parsed = parse_url($page_url);
+  $alias = trim($page_url_parsed['path'], '/');
+  $alias = str_replace('%20', ' ', $alias);
+  if (!path_load(array('alias' => $alias))) {
+    $entity->path = array(
+      'alias' => $alias,
+      'language' => LANGUAGE_NONE,
+      'pathauto' => 0,
+    );
+  }
 }

@@ -45,6 +45,26 @@ function _parser_prepare_field_text_with_summary(&$result, $field_info, $field_i
 }
 
 /**
+ * Prepare field type "number_integer"
+ */
+function _parser_prepare_field_number_integer(&$result, $field_info, $field_instance, $entity, $job, $base_url) {
+  if (!is_integer($result)) {
+    $result = trim($result);
+    $result = (int)$result;
+  }
+}
+
+/**
+ * Prepare field type "number_float"
+ */
+function _parser_prepare_field_number_float(&$result, $field_info, $field_instance, $entity, $job, $base_url) {
+  if (!is_float($result)) {
+    $result = trim($result);
+    $result = (float)$result;
+  }
+}
+
+/**
  * Prepare field type "taxonomy_term_reference"
  */
 function _parser_prepare_field_taxonomy_term_reference(&$result, $field_info, $field_instance, $entity, $job, $base_url) {

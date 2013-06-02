@@ -462,6 +462,18 @@ function _parser_job_form_advanced_settings($job, $check_button) {
     '#default_value' => isset($job->force_download) ? $job->force_download : 0,
   );
   
+  $form['advanced_settings']['force_download_list'] = array(
+    '#type' => 'textarea',
+    '#title' => 'Не использовать кэш для определённых адресов',
+    '#description' => 'Маски адресов, для которых отключено использование кэша. Оставьте пустым, если хотите отключить кэш для всех адресов. Пример заполнения: <code>http://drupal.org/project/modules?page=*</code>',
+    '#default_value' => isset($job->force_download_list) ? $job->force_download_list : '',
+    '#states' => array(
+      'visible' => array(
+        'input[name="force_download"]' => array('checked' => TRUE),
+      ),
+    ),
+  );
+  
   $form['advanced_settings']['list_mode'] = array(
     '#type' => 'checkbox',
     '#title' => 'Режим списка',
@@ -658,7 +670,8 @@ function parser_parse($job, $redirect_to_job, &$context) {
   
   $url = _parser_url_get_not_parsed($job->jid);
   $page_url = $GLOBALS['parser']['url'] = $url->url;
-  $page = _parser_get_page_by_url($page_url, $job->headers, $job->site_charset, $job->force_download && !$context['sandbox']['element']);
+  $force_download = _parser_page_need_force_download($page_url, $job, $context['sandbox']['element']);
+  $page = _parser_get_page_by_url($page_url, $job->headers, $job->site_charset, $force_download);
   $doc = _parser_create_phpquery($page, $job->charset_fix);
   $base = $doc->find('base')->attr('href');
   $base_url = $base ? $base : $page_url;
@@ -1814,4 +1827,20 @@ function _parser_set_entity_path(&$entity, $page_url) {
       'pathauto' => 0,
     );
   }
+}
+
+/**
+ * Return TRUE if page need force download.
+ */
+function _parser_page_need_force_download($page_url, $job, $element) {
+  $force_download = FALSE;
+  if ($job->force_download && !$element) {
+    if ($job->force_download_list) {
+      $force_download = drupal_match_path($page_url, $job->force_download_list);
+    }
+    else {
+      $force_download = TRUE;
+    }
+  }
+  return $force_download;
 }

@@ -131,6 +131,10 @@ function parser_schema() {
         'not null' => TRUE,
         'default' => 0,
       ),
+      'force_download_list' => array(
+        'type' => 'text',
+        'not null' => TRUE,
+      ),
       'sleep' => array(
         'type' => 'int',
         'size' => 'tiny',
@@ -292,6 +296,7 @@ function parser_install() {
     'headers' => 'User-Agent: Opera/9.80 (Windows NT 6.1; U; ru) Presto/2.8.131 Version/11.10' . "\n",
     'proxies' => '',
     'force_download' => 0,
+    'force_download_list' => '',
     'sleep' => 0,
   ))->save();
 }
@@ -502,4 +507,12 @@ function parser_update_7214() {
 function parser_update_7215() {
   db_drop_field('parser_urls', 'page_url');
   db_drop_field('parser_urls', 'href');
+}
+
+/**
+ * Add new col to {parser_jobs}
+ */
+function parser_update_7216() {
+  db_add_field('parser_jobs', 'force_download_list', array('type' => 'text'));
+  drupal_flush_all_caches();
 }

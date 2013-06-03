@@ -1844,3 +1844,20 @@ function _parser_page_need_force_download($page_url, $job, $element) {
   }
   return $force_download;
 }
+
+/**
+ * Return file name.
+ */
+function _parser_get_file_name_from_url($path) {
+  $filename = drupal_basename($path);
+  return current(explode('?', $filename));
+}
+
+/**
+ * Return file extension.
+ */
+function _parser_get_file_extension_from_url($path) {
+  $ext = pathinfo($path, PATHINFO_EXTENSION);
+  $ext = current(explode('?', $ext));
+  return drupal_strtolower($ext);
+}

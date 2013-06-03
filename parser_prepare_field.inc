@@ -108,9 +108,8 @@ function _parser_prepare_field_file(&$result, $field_info, $field_instance, $ent
   }
   
   $file_url = parser_get_absolute_url($base_url, $result['file']);
-  $file_name = drupal_basename($file_url);
-  $file_ext = pathinfo($file_name, PATHINFO_EXTENSION);
-  $file_ext = drupal_strtolower($file_ext);
+  $file_name = _parser_get_file_name_from_url($file_url);
+  $file_ext = _parser_get_file_extension_from_url($file_name);
   if (function_exists('transliteration_clean_filename')) {
     $file_name = transliteration_clean_filename($file_name);
   }
@@ -162,4 +161,3 @@ function _parser_prepare_field_file(&$result, $field_info, $field_instance, $ent
 function _parser_prepare_field_image(&$result, $field_info, $field_instance, $entity, $job, $base_url) {
   _parser_prepare_field_file($result, $field_info, $field_instance, $entity, $job, $base_url);
 }
-

@@ -138,15 +138,15 @@ function parser_job_form($form, &$form_state, $job) {
   );
   
   $form['start_url'] = array(
-    '#type' => 'textfield',
+    '#type' => 'textarea',
     '#title' => 'Стартовый URL',
     '#description' => '
       Адрес, с которого парсер начнёт работу. Пример заполнения: <code>http://drupal.org/project/modules</code><br />
-      В адресе можно использовать маску для числовых значений в формате <code>[mask:min,max]</code>, например: <code>http://drupal.org/project/modules?page=[mask:0,890]</code>
+      В адресе можно использовать маску для числовых значений в формате <code>[mask:min,max]</code>, например: <code>http://drupal.org/project/modules?page=[mask:0,890]</code><br />
+      В поле можно указать несколько адресов, каждый на новой строке.
     ',
     '#required' => TRUE,
     '#default_value' => isset($job->start_url) ? $job->start_url : '',
-    '#maxlength' => 255,
   );
   
   $form['test_url'] = array(
@@ -617,14 +617,20 @@ function parser_run_batch($job, $redirect_to_job = FALSE, $resume = FALSE) {
   if (!$resume) {
     _parser_url_delete_all($job->jid);
     
-    if (preg_match('#\[mask:(\d+),(\d+)\]#', $job->start_url, $matches)) {
-      for ($i = $matches[1]; $i <= $matches[2]; $i++) {
-        $start_url = str_replace('[mask:' . $matches[1] . ',' . $matches[2] . ']', $i, $job->start_url);
+    $start_urls = explode("\n", trim($job->start_url));
+    foreach ($start_urls as $start_url) {
+      $start_url = trim($start_url);
+      if (preg_match('#\[mask:(\d+),(\d+)\]#', $start_url, $matches)) {
+        $min = (int)$matches[1];
+        $max = (int)$matches[2];
+        for ($i = $min; $i <= $max; $i++) {
+          $url = str_replace('[mask:' . $matches[1] . ',' . $matches[2] . ']', $i, $start_url);
+          _parser_url_add($url, $job->jid);
+        }
+      }
+      else {
         _parser_url_add($start_url, $job->jid);
       }
-    }
-    else {
-      _parser_url_add($job->start_url, $job->jid);
     }
   }
 
@@ -1527,7 +1533,8 @@ function _parser_get_rows($text) {
 function _parser_set_rows(&$form) {
   foreach (element_children($form) as $element) {
     if (isset($form[$element]['#type']) && $form[$element]['#type'] == 'textarea') {
-      $form[$element]['#rows'] = _parser_get_rows($form[$element]['#default_value']);
+      $rows = _parser_get_rows($form[$element]['#default_value']);
+      $form[$element]['#rows'] = ($rows > 20) ? 20 : $rows;
     }
     else {
       _parser_set_rows($form[$element]);

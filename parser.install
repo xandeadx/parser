@@ -18,6 +18,10 @@ function parser_schema() {
         'default' => '',
       ),
       'start_url' => array(
+        'type' => 'text',
+        'not null' => TRUE,
+      ),
+      'test_url' => array(
         'type' => 'varchar',
         'length' => 255,
         'not null' => TRUE,
@@ -29,12 +33,6 @@ function parser_schema() {
         'unsigned' => TRUE,
         'not null' => TRUE,
         'default' => 1,
-      ),
-      'test_url' => array(
-        'type' => 'varchar',
-        'length' => 255,
-        'not null' => TRUE,
-        'default' => '',
       ),
       'depth' => array(
         'type' => 'int',
@@ -514,5 +512,16 @@ function parser_update_7215() {
  */
 function parser_update_7216() {
   db_add_field('parser_jobs', 'force_download_list', array('type' => 'text'));
+  drupal_flush_all_caches();
+}
+
+/**
+ * Change {parser_jobs}.start_url
+ */
+function parser_update_7217() {
+  db_change_field('parser_jobs', 'start_url', 'start_url', array(
+    'type' => 'text',
+    'not null' => TRUE,
+  ));
   drupal_flush_all_caches();
 }

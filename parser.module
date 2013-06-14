@@ -1524,7 +1524,13 @@ function _parser_get_url_by_entity_id($entity_type, $entity_id, $jid = NULL) {
  */
 function _parser_get_rows($text) {
   $count = substr_count(trim($text), "\n") + 1;
-  return $count > 3 ? $count : 3;
+  if ($count < 3) {
+    $count = 3;
+  }
+  elseif ($count > 20) {
+    $count = 20;
+  }
+  return $count;
 }
 
 /**
@@ -1533,8 +1539,7 @@ function _parser_get_rows($text) {
 function _parser_set_rows(&$form) {
   foreach (element_children($form) as $element) {
     if (isset($form[$element]['#type']) && $form[$element]['#type'] == 'textarea') {
-      $rows = _parser_get_rows($form[$element]['#default_value']);
-      $form[$element]['#rows'] = ($rows > 20) ? 20 : $rows;
+      $form[$element]['#rows'] = _parser_get_rows($form[$element]['#default_value']);
     }
     else {
       _parser_set_rows($form[$element]);

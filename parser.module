@@ -1327,6 +1327,20 @@ function parser_get_entity_id_from_feeds_items($importer_name, $guid) {
 }
 
 /**
+ * Return array of elements value.
+ */
+function parser_phpquery_get_elements_values($doc, $selector, $function = 'html', $map = 'trim') {
+  $values = array();
+  foreach ($doc->find($selector) as $element) {
+    $values[] = pq($element)->$function();
+  }
+  if ($map) {
+    $values = array_map($map, $values);
+  }
+  return $values;
+}
+
+/**
  * Get URL info.
  */
 function _parser_url_get($url, $jid) {

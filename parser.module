@@ -464,7 +464,7 @@ function _parser_job_form_advanced_settings($job, $check_button) {
   
   $form['advanced_settings']['force_download_list'] = array(
     '#type' => 'textarea',
-    '#title' => 'Отключить кэш страниц для следующих адресов',
+    '#title' => 'Отключить кэш для следующих адресов',
     '#description' => 'Маски адресов, для которых отключено использование кэша. Оставьте пустым, если хотите отключить кэш для всех страниц. Пример заполнения: <code>http://drupal.org/project/modules?page=*</code>',
     '#default_value' => isset($job->force_download_list) ? $job->force_download_list : '',
     '#states' => array(
@@ -980,6 +980,13 @@ function parser_redirect($entity_type, $entity_id) {
 function parser_result_page($job) {
   $entity_info = entity_get_info($job->entity_type);
   $label_key = isset($entity_info['entity keys']['label']) ? $entity_info['entity keys']['label'] : '';
+  $header = array(
+    array('data' => '№'),
+    array('data' => 'Entity ID (' . $entity_info['entity keys']['id'] . ')', 'field' => $entity_info['entity keys']['id']),
+    array('data' => 'Remote ID',                                             'field' => 'remote_id'),
+    array('data' => 'Label' . ($label_key ? ' (' . $label_key . ')' : ''),   'field' => $label_key),
+    array('data' => 'Original URL',                                          'field' => 'url'),
+  );
   
   $query = db_select('parser_map', 'pm');
   $query->fields('pm', array('entity_id', 'url', 'remote_id'));
@@ -988,6 +995,7 @@ function parser_result_page($job) {
   }
   $query->innerJoin($entity_info['base table'], 'e', 'e.' . $entity_info['entity keys']['id'] . ' = pm.entity_id');
   $query->condition('jid', $job->jid);
+  $query->extend('TableSort')->orderByHeader($header);
   
   $rows = array();
   foreach ($query->execute() as $i => $row) {
@@ -1004,13 +1012,7 @@ function parser_result_page($job) {
   
   return array(
     '#theme' => 'table',
-    '#header' => array(
-      '№',
-      'Entity ID (' . $entity_info['entity keys']['id'] . ')',
-      'Remote ID',
-      'Label' . ($label_key ? ' (' . $label_key . ')' : ''),
-      'Original URL',
-    ),
+    '#header' => $header,
     '#rows' => $rows,
     '#empty' => 'Пусто...',
   );

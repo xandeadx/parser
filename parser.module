@@ -386,6 +386,8 @@ function parser_job_form($form, &$form_state, $job) {
   $form['#attached']['library'][] = array('parser', 'codemirror');
   $form['#attached']['css'][] = $parser_path . '/parser.css';
   $form['#attached']['js'][] = $parser_path . '/parser.js';
+  
+  drupal_add_js(array('parserCheckPath' => url('parser/check')), 'setting');
 
   return $form;
 }

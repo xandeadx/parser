@@ -1,6 +1,4 @@
-
 (function ($) {
-
   Drupal.behaviors.parser = {
     attach: function (context, settings) {
       // Show result in popup window
@@ -18,7 +16,7 @@
       
         $('<div id="parser-dialog">Загрузка...</div>').dialog({
           open: function() {
-            $.post(Drupal.settings.basePath + 'parser/check', params, function(response) {
+            $.post(Drupal.settings.parserCheckPath, params, function(response) {
               $('#parser-dialog').text($.trim(response));
             });
           },
@@ -52,5 +50,4 @@
       }).addClass('codemirror-refreshed');
     }
   };
-
 }(jQuery));

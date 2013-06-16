@@ -411,7 +411,7 @@ function _parser_job_form_advanced_settings($job, $check_button) {
   
   $form['advanced_settings']['sleep'] = array(
     '#type' => 'textfield',
-    '#title' => 'Задержка между http запросами к сайту источнику',
+    '#title' => 'Задержка между http запросами',
     '#description' => 'Количество секунд между http запросами к сайту источнику. Помогает обойти защиту от парсинга. По умолчанию задержка отсутствует.',
     '#default_value' => !empty($job->sleep) ? $job->sleep : 0,
     '#size' => 5,
@@ -457,15 +457,15 @@ function _parser_job_form_advanced_settings($job, $check_button) {
   
   $form['advanced_settings']['force_download'] = array(
     '#type' => 'checkbox',
-    '#title' => 'Не использовать кэш',
-    '#description' => 'Отметьте, если хотите чтобы парсер скачивал url-ы даже если они есть в кэше.',
+    '#title' => 'Не брать страницы из кэша',
+    '#description' => 'Отметьте, если хотите чтобы парсер скачивал страницы даже если они есть в кэше.',
     '#default_value' => isset($job->force_download) ? $job->force_download : 0,
   );
   
   $form['advanced_settings']['force_download_list'] = array(
     '#type' => 'textarea',
-    '#title' => 'Не использовать кэш для определённых адресов',
-    '#description' => 'Маски адресов, для которых отключено использование кэша. Оставьте пустым, если хотите отключить кэш для всех адресов. Пример заполнения: <code>http://drupal.org/project/modules?page=*</code>',
+    '#title' => 'Отключить кэш страниц для следующих адресов',
+    '#description' => 'Маски адресов, для которых отключено использование кэша. Оставьте пустым, если хотите отключить кэш для всех страниц. Пример заполнения: <code>http://drupal.org/project/modules?page=*</code>',
     '#default_value' => isset($job->force_download_list) ? $job->force_download_list : '',
     '#states' => array(
       'visible' => array(

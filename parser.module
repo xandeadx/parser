@@ -902,18 +902,20 @@ function parser_finished($success, $results, $operations) {
  */
 function parser_entity_delete($entity, $entity_type) {
   $entity_id = entity_id($entity_type, $entity);
-    
+
   $query = db_select('parser_map', 'pm');
   $query->fields('pm', array('jid'));
   $query->innerJoin('parser_jobs', 'pj', 'pj.jid = pm.jid');
   $query->condition('pj.entity_type', $entity_type);
   $query->condition('pm.entity_id', $entity_id);
   $jid = $query->execute()->fetchField();
-    
-  db_delete('parser_map')
-    ->condition('jid', $jid)
-    ->condition('entity_id', $entity_id)
-    ->execute();
+
+  if ($jid) {
+    db_delete('parser_map')
+      ->condition('jid', $jid)
+      ->condition('entity_id', $entity_id)
+      ->execute();
+  }
 }
 
 /**

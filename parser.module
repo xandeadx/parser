@@ -669,6 +669,7 @@ function parser_parse($job, $redirect_to_job, &$context) {
     $context['results']['files_from_http'] = 0;
     $context['results']['files_from_http_error'] = 0;
     $context['results']['files_from_cache'] = 0;
+    $context['results']['last_error_file'] = '';
     $context['results']['redirect_to_job'] = $redirect_to_job;
     $context['results']['messages_count'] = _parser_get_watchdog_rows_count();
   }
@@ -848,6 +849,7 @@ function parser_parse($job, $redirect_to_job, &$context) {
   
   // Statistics
   $new_watchdog_row_count = _parser_get_watchdog_rows_count() - $context['results']['messages_count'];
+  $last_error_file = $context['results']['files_from_http_error'] ? ' (последний: ' . check_plain($GLOBALS['parser']['stat']['last_error_file']) . ')' : '';
   $messages = array(
     'Последняя обработанная страница' => '(' . $url->depth . ') ' . $page_url,
     'Обработано страниц'              => $context['sandbox']['progress'],
@@ -855,7 +857,7 @@ function parser_parse($job, $redirect_to_job, &$context) {
     'Создано сущностей'               => $context['results']['created_entities'],
     'Обновлено сущностей'             => $context['results']['updated_entities'],
     'Скачано url'                     => $context['results']['files_from_http'],
-    'Не удалось скачать url'          => $context['results']['files_from_http_error'],
+    'Не удалось скачать url'          => $context['results']['files_from_http_error'] . $last_error_file,
     'URL взято из кэша'               => $context['results']['files_from_cache'],
     'Затрачено времени'               => gmdate('H:i:s', time() - $context['results']['time_start']),
     'Новых сообщений в watchdog'      => $new_watchdog_row_count,
@@ -1475,11 +1477,13 @@ function _parser_download_url_to_cache($url, $headers = array(), $force_download
     if (!empty($result->error)) {
       _parser_watchdog('Ошибка при закачке "' . check_plain($url) . '": ' . check_plain($result->error) . (isset($result->data) ? ', <b>Результат</b>: ' . check_plain(drupal_substr($result->data, 0, 1000)) : ''), NULL, WATCHDOG_ERROR);
       $GLOBALS['parser']['stat']['files_from_http_error']++;
+      $GLOBALS['parser']['stat']['last_error_file'] = $url;
       return NULL;
     }
     if (!$result->data) {
       _parser_watchdog('Ошибка при закачке "' . check_plain($url) . '": сервер не возвратил данных.', NULL, WATCHDOG_ERROR);
       $GLOBALS['parser']['stat']['files_from_http_error']++;
+      $GLOBALS['parser']['stat']['last_error_file'] = $url;
       return NULL;
     }
     

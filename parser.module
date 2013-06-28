@@ -850,16 +850,20 @@ function parser_parse($job, $redirect_to_job, &$context) {
   // Statistics
   $new_watchdog_row_count = _parser_get_watchdog_rows_count() - $context['results']['messages_count'];
   $last_error_file = $context['results']['files_from_http_error'] ? ' (последний: ' . check_plain($GLOBALS['parser']['stat']['last_error_file']) . ')' : '';
+  $queue_pages = $context['sandbox']['max'] - $context['sandbox']['progress'];
+  $elapsed_time = time() - $context['results']['time_start'];
+  $left_time = ($queue_pages / $context['sandbox']['progress']) * $elapsed_time;
   $messages = array(
     'Последняя обработанная страница' => '(' . $url->depth . ') ' . $page_url,
     'Обработано страниц'              => $context['sandbox']['progress'],
-    'Страниц в очереди'               => ($context['sandbox']['max'] - $context['sandbox']['progress']),
+    'Страниц в очереди'               => $queue_pages,
     'Создано сущностей'               => $context['results']['created_entities'],
     'Обновлено сущностей'             => $context['results']['updated_entities'],
     'Скачано url'                     => $context['results']['files_from_http'],
     'Не удалось скачать url'          => $context['results']['files_from_http_error'] . $last_error_file,
     'URL взято из кэша'               => $context['results']['files_from_cache'],
-    'Затрачено времени'               => gmdate('H:i:s', time() - $context['results']['time_start']),
+    'Затрачено времени'               => gmdate('H:i:s', $elapsed_time),
+    'Осталось времени'                => gmdate('H:i:s', $left_time),
     'Новых сообщений в watchdog'      => $new_watchdog_row_count,
   );
   if ($new_watchdog_row_count) {

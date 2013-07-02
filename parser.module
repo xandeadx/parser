@@ -488,7 +488,7 @@ function _parser_job_form_advanced_settings($job, $check_button) {
     '#description' => 'Отметьте, если сущности на сайте источнике не имеют своих страниц, а располагаются в виде списков. Например это могут быть комментарии.',
     '#default_value' => !empty($job->list_mode_code),
   );
-  
+
   $form['advanced_settings']['list_mode_code'] = array(
     '#type' => 'textarea',
     '#title' => 'Элементы списка',
@@ -1445,11 +1445,11 @@ function _parser_get_page_by_url($url, $headers = array(), $charset = 'auto', $f
     return NULL;
   }
   $page = file_get_contents($page_cache_uri);
-  
+
   // Convert charset
   if ($charset == 'auto') {
     if (preg_match('# content="text/html; charset=(.+)"#isU', $page, $matches) && drupal_strtolower($matches[1]) != 'utf-8') {
-      $page = iconv($matches[1], 'UTF-8//IGNORE', $page);
+      $page = utf8_encode($page);
       $page = str_ireplace(
         ' content="text/html; charset=' . $matches[1] . '"',
         ' content="text/html; charset=utf-8"',
@@ -1460,7 +1460,7 @@ function _parser_get_page_by_url($url, $headers = array(), $charset = 'auto', $f
   else if ($charset != 'UTF-8') {
     $page = iconv($charset, 'UTF-8//IGNORE', $page);
   }
-      
+
   return $page;
 }
 

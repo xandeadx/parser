@@ -312,7 +312,7 @@ function parser_job_form($form, &$form_state, $job) {
       '#group' => 'vertical_tabs',
     );
     
-    $description = 'PHP код, который должен вернуть ' . ($this_property_is_multi_value ? 'массив значений' : 'значение') . ' поля';
+    $description = 'PHP код, который должен вернуть ' . ($this_property_is_multi_value ? 'массив значений (<code>array(значение1, значение2, ...)</code>)' : 'значение') . ' поля';
     // Simle field or property
     if (!isset($property_info['property info'])) {
       $description .= ($field_type ? ' (тип: ' . check_plain($field_type) . ').' : '.');

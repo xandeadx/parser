@@ -312,7 +312,7 @@ function parser_job_form($form, &$form_state, $job) {
       '#group' => 'vertical_tabs',
     );
     
-    $description = 'PHP код, который должен вернуть ' . ($this_property_is_multi_value ? 'массив значений' : 'значение') . ' поля';
+    $description = 'PHP код, который должен вернуть ' . ($this_property_is_multi_value ? 'массив значений поля (<code>array(значение1, значение2, ...)</code>)' : 'значение поля');
     // Simle field or property
     if (!isset($property_info['property info'])) {
       $description .= ($field_type ? ' (тип: ' . check_plain($field_type) . ').' : '.');
@@ -805,7 +805,7 @@ function parser_parse($job, $redirect_to_job, &$context) {
         }
       }
       
-      _parser_set_property($entity_wrapper, $property_name, $result, $property_is_compound, $field_is_multi_value);
+      _parser_set_property($entity_wrapper, $property_name, $result, $property_is_compound, $field_is_multi_value, $property_info);
     }
     
     // Set Path alias
@@ -1641,7 +1641,7 @@ function _parser_get_field_structure($field_info, $spaces = 2) {
 /**
  * Set entity property.
  */
-function _parser_set_property($entity_wrapper, $property_name, $property_value, $property_is_compound, $property_is_multi_value) {
+function _parser_set_property($entity_wrapper, $property_name, $property_value, $property_is_compound, $property_is_multi_value, $property_info) {
   // Multi-value compound property
   if ($property_is_multi_value && $property_is_compound && $property_value) {
     foreach ($property_value as $delta => $property_item) {
@@ -1657,12 +1657,24 @@ function _parser_set_property($entity_wrapper, $property_name, $property_value, 
   }
   // Single-value compound property
   else if (!$property_is_multi_value && $property_is_compound && $property_value) {
-    foreach ($property_value as $sub_property_name => $sub_property_value) {
+    // Create value
+    if ($entity_wrapper->{$property_name}->value() === NULL && empty($property_info['auto creation'])) {
       try {
-        $entity_wrapper->{$property_name}->{$sub_property_name} = $sub_property_value;
+        $entity_wrapper->{$property_name} = $property_value;
       }
       catch (Exception $e) {
-        _parser_watchdog('Ошибка при записи в $entity_wrapper->' . $property_name . '->' . $sub_property_name . ': ' . $e->getMessage(), $sub_property_value, WATCHDOG_ERROR);
+        _parser_watchdog('Ошибка при записи в $entity_wrapper->' . $property_name . ': ' . $e->getMessage(), $property_value, WATCHDOG_ERROR);
+      }
+    }
+    // Set value
+    else {
+      foreach ($property_value as $sub_property_name => $sub_property_value) {
+        try {
+          $entity_wrapper->{$property_name}->{$sub_property_name} = $sub_property_value;
+        }
+        catch (Exception $e) {
+          _parser_watchdog('Ошибка при записи в $entity_wrapper->' . $property_name . '->' . $sub_property_name . ': ' . $e->getMessage(), $sub_property_value, WATCHDOG_ERROR);
+        }
       }
     }
   }

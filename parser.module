@@ -279,9 +279,12 @@ function parser_job_form($form, &$form_state, $job) {
       <p>Оставьте textarea пустым или верните NULL, если поле заполнять не нужно.</p>
       <p>
         Полезные функции:<br />
-        <code>parser_get_pqelements_values($doc, $selector, $function = \'html\', $map = \'trim\')</code> - возвращает массив значений элементов.<br />
-        <code>parser_get_entity_id_by_remote_id($remote_id, $jid = NULL)</code> - возвращает id созданной сущности по Remote ID.<br />
-        <code>parser_get_entity_by_conditions($entity_type, $properties = NULL, $fields = NULL)</code> - возвращает объект сущности по значениям её свойств и полей.<br />
+        <code>parser_get_pqelements_values($doc, $selector, $function = \'html\', $map = \'trim\')</code>
+        - возвращает массив значений элементов.<br />
+        <code>parser_get_entity_id_by_remote_id($remote_id, $job_id = NULL)</code>
+        - возвращает id созданной сущности по Remote ID.<br />
+        <code>parser_get_entity_by_conditions($entity_type, array $properties = NULL, array $fields = NULL)</code>
+        - возвращает объект сущности по значениям её свойств и полей.<br />
       </p>
     ',
   );

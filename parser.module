@@ -126,6 +126,7 @@ function parser_entity_delete($entity, $entity_type) {
  */
 function parser_entity_view($entity, $entity_type, $view_mode, $langcode) {
   if ($view_mode == 'full' && $GLOBALS['user']->uid == 1 && variable_get('parser_show_source_link', 1)) {
+    module_load_include('inc', 'parser');
     $entity_id = entity_id($entity_type, $entity);
     $url = _parser_get_url_by_entity_id($entity_type, $entity_id);
     if ($url) {

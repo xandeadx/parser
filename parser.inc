@@ -1413,7 +1413,7 @@ function parser_get_absolute_url($base_url, $relative_url) {
  * Create phpQuery object.
  */
 function _parser_create_phpquery($html, $charset_fix = FALSE) {
-  require_once('phpQuery/phpQuery/phpQuery.php');
+  require_once DRUPAL_ROOT . '/' . drupal_get_path('module', 'parser') . '/phpQuery/phpQuery/phpQuery.php';
   return phpQuery::newDocumentHTML($html, $charset_fix ? 'utf8' : NULL);
 }
 

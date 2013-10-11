@@ -859,7 +859,7 @@ function parser_parse($job, $redirect_to_job, &$context) {
  * Site is parsed.
  */
 function parser_finished($success, $results, $operations) {
-  drupal_set_message('
+  $message = '
     ' . ($success ? 'Парсинг завершён' : 'Парсинг завершён с ошибками') . '.<br />
     Обработано страниц: ' . _parser_url_count($results['jid'], 1) . '<br />
     Скачано URL: ' . $results['files_from_http'] . '<br />
@@ -869,8 +869,10 @@ function parser_finished($success, $results, $operations) {
     Обновлено сущностей: ' . l($results['updated_entities'], 'admin/structure/parser_jobs/results/' . $results['jid']) . '<br />
     Затрачено времени: ' . gmdate('H:i:s', time() - $results['time_start']) . '<br />
     Новых сообщений в системном журнале: ' . l(_parser_get_watchdog_rows_count() - $results['messages_count'], 'admin/reports/dblog') . '<br />
-  ', $success ? 'status' : 'error');
-  
+  ';
+  drupal_set_message($message, $success ? 'status' : 'error');
+  watchdog('parser', $message, NULL, $success ? WATCHDOG_NOTICE : WATCHDOG_ERROR);
+
   if ($results['redirect_to_job']) {
     drupal_goto('admin/structure/parser_jobs/manage/' . $results['jid']);
   }

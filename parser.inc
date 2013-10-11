@@ -582,8 +582,14 @@ function parser_run_batch($job, $redirect_to_job = FALSE, $resume = FALSE) {
   if (is_numeric($job)) {
     $job = parser_job_load($job);
   }
-  
+
+  if (!empty($job->clear_watchdog)) {
+    db_delete('watchdog')->execute();
+  }
+
   if (!$resume) {
+    watchdog('parser', 'Начался парсинг "' . $job->title . '"', NULL);
+
     _parser_url_delete_all($job->jid);
 
     if ($job->init_code) {
@@ -607,10 +613,6 @@ function parser_run_batch($job, $redirect_to_job = FALSE, $resume = FALSE) {
     }
   }
 
-  if (!empty($job->clear_watchdog)) {
-    db_delete('watchdog')->execute();
-  }
-  
   batch_set(array(
     'title' => 'Парсинг',
     'progress_message' => '',

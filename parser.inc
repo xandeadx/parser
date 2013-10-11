@@ -202,19 +202,24 @@ function parser_job_form($form, &$form_state, $job) {
     
   // Properties & Fields
   foreach (($entity_properties + $entity_properties_fields) as $property_name => $property_info) {
-    if (!empty($property_info['computed']) || !isset($property_info['setter callback'])) {
+    $this_property_is_field = isset($property_info['field']);
+
+    if (
+      !empty($property_info['computed']) ||
+      !isset($property_info['setter callback']) ||
+      ($this_property_is_field && !isset($fields_info[$property_name]))
+    ) {
       continue;
     }
-    
+
     $fieldset_name = $property_name . '_fieldset';
     $field_type = isset($property_info['type']) ? $property_info['type'] : '';
-    $this_property_is_field = isset($property_info['field']);
     $this_property_is_multi_value = ($this_property_is_field && $fields_info[$property_name]['cardinality'] != 1);
-    
+
     if ($this_property_is_field && empty($fields_instances[$property_name])) {
       continue;
     }
-    
+
     $form['fields_wrapper']['fields_code'][$fieldset_name] = array(
       '#type' => 'fieldset',
       '#title' => $property_info['label'] . ' (' . $property_name . ')' . (!empty($property_info['required']) ? ' *' : ''),

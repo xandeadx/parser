@@ -328,7 +328,10 @@ function _parser_job_form_advanced_settings($job, $check_button) {
   $form['advanced_settings']['parse_limit'] = array(
     '#type' => 'textfield',
     '#title' => 'Ограничить число создаваемых/обновляемых сущностей',
-    '#description' => 'Максимальное число сущностей, которое сможет создать/обновить парсер. Применяется в осномном при тестировании задания. Оставьте пустым, если ограничения не нужны.',
+    '#description' => '
+      Максимальное число сущностей, которое сможет создать/обновить парсер. Применяется в осномном при тестировании
+      задания. Оставьте пустым, если ограничения не нужны.
+    ',
     '#default_value' => !empty($job->parse_limit) ? $job->parse_limit : '',
     '#size' => 5,
   );
@@ -336,12 +339,28 @@ function _parser_job_form_advanced_settings($job, $check_button) {
   $form['advanced_settings']['sleep'] = array(
     '#type' => 'textfield',
     '#title' => 'Задержка между http запросами',
-    '#description' => 'Количество секунд между http запросами к сайту источнику. Помогает обойти защиту от парсинга. По умолчанию задержка отсутствует.',
+    '#description' => '
+      Количество секунд между http запросами к сайту источнику. Помогает обойти защиту от парсинга. По умолчанию
+      задержка отсутствует.
+    ',
     '#default_value' => !empty($job->sleep) ? $job->sleep : 0,
     '#size' => 5,
     '#field_suffix' => 'сек.',
   );
-  
+
+  $form['advanced_settings']['run_period'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Периодичность запуска в фоне',
+    '#description' => '
+      Период фонового запуска парсера. Оставьте пустым, если не хотите запускать парсинг автоматически. Значение должно
+      быть не меньше периодичности запуска крона. Перед использованием опции, убедитесь, что cron запускается с помощью
+      crontab и период на странице <code>admin/config/system/cron</code> равен <i>Never</i>.
+    ',
+    '#default_value' => !empty($job->run_period) ? $job->run_period : '',
+    '#size' => 5,
+    '#field_suffix' => 'сек.',
+  );
+
   $form['advanced_settings']['site_charset'] = array(
     '#type' => 'select',
     '#title' => 'Кодировка сайта',
@@ -533,6 +552,9 @@ function parser_job_form_submit(&$form, &$form_state) {
   
   if (!$form_state['values']['parse_limit']) {
     $form_state['values']['parse_limit'] = 0;
+  }
+  if (!$form_state['values']['run_period']) {
+    $form_state['values']['run_period'] = 0;
   }
   
   $job = entity_ui_form_submit_build_entity($form, $form_state);

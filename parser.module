@@ -207,3 +207,26 @@ function parser_entity_property_info_alter(&$info) {
     }
   }
 }
+
+/**
+ * Implements hook_cron().
+ */
+function parser_cron() {
+  $jids = db_select('parser_jobs', 'j')
+    ->fields('j', array('jid'))
+    ->condition('j.run_period', 0, '>')
+    ->where('j.last_run + j.run_period <= ' . REQUEST_TIME)
+    ->execute()
+    ->fetchCol();
+
+  if ($jids) {
+    module_load_include('inc', 'parser');
+
+    foreach ($jids as $jid) {
+      $job = parser_job_load($jid);
+      $job->last_run = REQUEST_TIME;
+      entity_save('parser_job', $job);
+      parser_run_in_background($jid);
+    }
+  }
+}

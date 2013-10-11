@@ -429,7 +429,27 @@ function _parser_job_form_advanced_settings($job, $check_button) {
       ),
     ),
   ) + $check_button;
-  
+
+  $form['advanced_settings']['init_code'] = array(
+    '#type' => 'textarea',
+    '#title' => 'Код предварительной инициализации',
+    '#description' => '
+      Код, который будет выполнен перед загрузкой стартового адреса. Например, здесь можно пройти авторизацию и сохранить
+      номер сессии в переменную с префиксом <code>parser_data_</code> для дальнейшего использования в HTTP заголовках.
+      Пример кода:<br />
+      <code>
+        $post_data = array(\'username\' => \'admin\', \'password\' => \'1234\');<br />
+        $result = _parser_post_request(\'http://example.com/login.php\', $post_data, array(\'max_redirects\' => 0));<br />
+        if (preg_match(\'#SessId=(.+?);#\', $result->headers[\'set-cookie\'], $matches)) {<br />
+        &nbsp;&nbsp;variable_set(\'parser_data_examplecom_sessid\', $matches[1]);<br />
+        }<br />
+      </code>
+    ',
+    '#default_value' => isset($job->init_code) ? $job->init_code : '',
+    '#rows' => 3,
+    '#resizable' => FALSE,
+  ) + $check_button;
+
   $form['advanced_settings']['prepare_code'] = array(
     '#type' => 'textarea',
     '#title' => 'Пост-обработка сущности',
@@ -449,7 +469,10 @@ function _parser_job_form_advanced_settings($job, $check_button) {
   $form['advanced_settings']['headers'] = array(
     '#type' => 'textarea',
     '#title' => 'HTTP заголовки',
-    '#description' => 'Заголовки, используемые кравлером.',
+    '#description' => '
+      Заголовки, используемые кравлером. В тексте можно использовать токены в формате <code>[parser_data_VARNAME]</code>,
+      которые будут заменены на значения, возвращаемые функцией <code>variable_get(\'parser_data_VARNAME\')</code>
+    ',
     '#default_value' => isset($job->headers) ? $job->headers : 'User-Agent: Opera/9.80 (Windows NT 6.1; U; ru) Presto/2.8.131 Version/11.10' . "\n",
   );
   
@@ -540,7 +563,11 @@ function parser_run_batch($job, $redirect_to_job = FALSE, $resume = FALSE) {
   
   if (!$resume) {
     _parser_url_delete_all($job->jid);
-    
+
+    if ($job->init_code) {
+      eval($job->init_code);
+    }
+
     $start_urls = explode("\n", trim($job->start_url));
     foreach ($start_urls as $start_url) {
       $start_url = trim($start_url);
@@ -775,7 +802,7 @@ function parser_parse($job, $redirect_to_job, &$context) {
   $last_error_file = $context['results']['files_from_http_error'] ? ' (последний: ' . check_plain($GLOBALS['parser']['stat']['last_error_file']) . ')' : '';
   $queue_pages = $context['sandbox']['max'] - $context['sandbox']['progress'];
   $elapsed_time = time() - $context['results']['time_start'];
-  $left_time = ($queue_pages / $context['sandbox']['progress']) * $elapsed_time;
+  $left_time = $context['sandbox']['progress'] ? ($queue_pages / $context['sandbox']['progress']) * $elapsed_time : 0;
   $messages = array(
     'Последняя обработанная страница' => '(' . $url->depth . ') ' . $page_url,
     'Обработано страниц'              => $context['sandbox']['progress'],
@@ -1237,26 +1264,27 @@ function _parser_url_count($jid, $parsed = NULL) {
 /**
  * Return page html by URL.
  */
-function _parser_get_page_by_url($url, $headers = array(), $charset = 'auto', $force_download = FALSE) { 
+function _parser_get_page_by_url($url, $headers = array(), $charset = 'auto', $force_download = FALSE) {
   $page_cache_uri = _parser_download_url_to_cache($url, $headers, $force_download);
   if (!$page_cache_uri) {
     return NULL;
   }
   $page = file_get_contents($page_cache_uri);
   
-  // Convert charset
+  // Find charset
   if ($charset == 'auto') {
-    if (preg_match('# content="text/html; charset=(.+)"#isU', $page, $matches) && drupal_strtolower($matches[1]) != 'utf-8') {
-      $page = iconv($matches[1], 'UTF-8//IGNORE', $page);
-      $page = str_ireplace(
-        ' content="text/html; charset=' . $matches[1] . '"',
-        ' content="text/html; charset=utf-8"',
-        $page
-      );
+    if (preg_match('# content="text/html; charset=(.+)"#isU', $page, $matches)) {
+      $charset = $matches[1];
     }
   }
-  else if ($charset != 'UTF-8') {
+  // Convert charset
+  if (drupal_strtolower($charset) != 'utf-8' && $charset != 'auto') {
     $page = iconv($charset, 'UTF-8//IGNORE', $page);
+    $page = str_ireplace(
+      ' content="text/html; charset=' . $charset . '"',
+      ' content="text/html; charset=utf-8"',
+      $page
+    );
   }
       
   return $page;
@@ -1273,10 +1301,15 @@ function _parser_download_url_to_cache($url, $headers = array(), $force_download
       sleep($GLOBALS['parser']['sleep']);
     }
     
+    // Headers
     if (is_string($headers)) {
       $headers = _parser_get_headers_array($headers);
     }
+    foreach ($headers as &$header) {
+      $header = preg_replace_callback('#\[(parser_data_.+?)\]#', '_parser_data_replace_callback', $header);
+    }
     $request_options = array('headers' => $headers);
+
     $result = drupal_http_request($url, $request_options);
     if ($result->code == 303 && !empty($result->headers['location'])) {
       $result = drupal_http_request($result->headers['location'], $request_options);
@@ -1303,6 +1336,13 @@ function _parser_download_url_to_cache($url, $headers = array(), $force_download
   }
   
   return $cache_uri;
+}
+
+/**
+ * Pre replace callback.
+ */
+function _parser_data_replace_callback($matches) {
+  return variable_get($matches[1]);
 }
 
 /**
@@ -1730,4 +1770,15 @@ function _parser_set_format_setter_callback(&$property_info) {
   ) {
     $property_info['property info']['format']['setter callback'] = 'entity_property_verbatim_set';
   }
+}
+
+/**
+ * Send POST http request.
+ */
+function _parser_post_request($url, array $data, array $options = array()) {
+  return drupal_http_request($url, $options + array(
+    'headers' => array('Content-Type' => 'application/x-www-form-urlencoded'),
+    'method' => 'POST',
+    'data' => drupal_http_build_query($data),
+  ));
 }

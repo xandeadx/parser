@@ -110,6 +110,10 @@ function parser_schema() {
         'type' => 'text',
         'not null' => TRUE,
       ),
+      'init_code' => array(
+        'type' => 'text',
+        'not null' => TRUE,
+      ),
       'prepare_code' => array(
         'type' => 'text',
         'not null' => TRUE,
@@ -136,6 +140,18 @@ function parser_schema() {
       'sleep' => array(
         'type' => 'int',
         'size' => 'tiny',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'run_period' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'last_run' => array(
+        'type' => 'int',
         'unsigned' => TRUE,
         'not null' => TRUE,
         'default' => 0,
@@ -290,6 +306,7 @@ function parser_install() {
       'author' => 'return 1;',
     ),
     'list_mode_code' => '',
+    'init_code' => '',
     'prepare_code' => '',
     'headers' => 'User-Agent: Opera/9.80 (Windows NT 6.1; U; ru) Presto/2.8.131 Version/11.10' . "\n",
     'proxies' => '',
@@ -522,6 +539,33 @@ function parser_update_7217() {
   db_change_field('parser_jobs', 'start_url', 'start_url', array(
     'type' => 'text',
     'not null' => TRUE,
+  ));
+  drupal_flush_all_caches();
+}
+
+/**
+ * Add new col to {parser_jobs}
+ */
+function parser_update_7218() {
+  db_add_field('parser_jobs', 'init_code', array('type' => 'text'));
+  drupal_flush_all_caches();
+}
+
+/**
+ * Add new cols to {parser_jobs}
+ */
+function parser_update_7219() {
+  db_add_field('parser_jobs', 'run_period', array(
+    'type' => 'int',
+    'unsigned' => TRUE,
+    'not null' => TRUE,
+    'default' => 0,
+  ));
+  db_add_field('parser_jobs', 'last_run', array(
+    'type' => 'int',
+    'unsigned' => TRUE,
+    'not null' => TRUE,
+    'default' => 0,
   ));
   drupal_flush_all_caches();
 }

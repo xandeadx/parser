@@ -1,104 +1,6 @@
 <?php
 
 /**
- * Implements hook_menu().
- */
-function parser_menu() {
-  $items = array();
-  
-  $items['parser/check'] = array(
-    'page callback' => 'parser_check_code',
-    'access arguments' => array('administer site configuration'),
-    'type' => MENU_CALLBACK,
-    'file' => 'parser.inc',
-  );
-  
-  $items['parser/redirect/%/%'] = array(
-    'page callback' => 'parser_redirect',
-    'page arguments' => array(2, 3),
-    'access arguments' => array('administer site configuration'),
-    'type' => MENU_CALLBACK,
-    'file' => 'parser.inc',
-  );
-  
-  $items['admin/structure/parser_jobs/results/%parser_job'] = array(
-    'title' => 'Parser results',
-    'page callback' => 'parser_result_page',
-    'page arguments' => array(4),
-    'access arguments' => array('administer site configuration'),
-    'type' => MENU_CALLBACK,
-    'file' => 'parser.inc',
-  );
-  
-  $items['admin/structure/parser_jobs/rollback/%parser_job'] = array(
-    'title' => 'Rollback',
-    'page callback' => 'drupal_get_form',
-    'page arguments' => array('parser_rollback_form', 4),
-    'access arguments' => array('administer site configuration'),
-    'type' => MENU_CALLBACK,
-    'file' => 'parser.inc',
-  );
-  
-  $items['admin/structure/parser_jobs/settings'] = array(
-    'title' => 'Settings',
-    'page callback' => 'drupal_get_form',
-    'page arguments' => array('parser_settings_form'),
-    'access arguments' => array('administer site configuration'),
-    'type' => MENU_LOCAL_TASK,
-    'file' => 'parser.inc',
-  );
-  
-  return $items;
-}
-
-/**
- * Implements hook_entity_info().
- */
-function parser_entity_info() {
-  return array(
-    'parser_job' => array(
-      'label' => t('Job parsing'),
-      'entity class' => 'Entity',
-      'controller class' => 'EntityAPIController',
-      'base table' => 'parser_jobs',
-      'entity keys' => array(
-        'id' => 'jid',
-        'label' => 'title',
-      ),
-      'admin ui' => array(
-        'path' => 'admin/structure/parser_jobs',
-        'file' => 'parser.inc',
-      ),
-      'uri callback' => 'parser_job_uri',
-      'access callback' => 'parser_job_access',
-      'module' => 'parser',
-      'exportable' => TRUE,
-    ),
-  );
-}
-
-/**
- * Check acces rights.
- */
-function parser_job_access($op, $entity, $account = NULL, $entity_type = 'parser_job') {
-  return user_access('administer site configuration');
-}
- 
-/**
- * Load entity object by id.
- */
-function parser_job_load($jid) {
-  return entity_load_single('parser_job', $jid);
-}
-
-/**
- * Parser job uri callback.
- */
-function parser_job_uri($job) {
-  return array('path' => 'admin/structure/parser_jobs/manage/' . $job->jid);
-}
-
-/**
  * Job form.
  */
 function parser_job_form($form, &$form_state, $job) {
@@ -285,9 +187,12 @@ function parser_job_form($form, &$form_state, $job) {
       <p>Оставьте textarea пустым или верните NULL, если поле заполнять не нужно.</p>
       <p>
         Полезные функции:<br />
-        <code>parser_get_pqelements_values($doc, $selector, $function = \'html\', $map = \'trim\')</code> - возвращает массив значений элементов.<br />
-        <code>parser_get_entity_id_by_remote_id($remote_id, $jid = NULL)</code> - возвращает id созданной сущности по Remote ID.<br />
-        <code>parser_get_entity_by_conditions($entity_type, $properties = NULL, $fields = NULL)</code> - возвращает объект сущности по значениям её свойств и полей.<br />
+        <code>parser_get_pqelements_values($doc, $selector, $function = \'html\', $map = \'trim\')</code>
+        - возвращает массив значений элементов.<br />
+        <code>parser_get_entity_id_by_remote_id($remote_id, $job_id = NULL)</code>
+        - возвращает id созданной сущности по Remote ID.<br />
+        <code>parser_get_entity_by_conditions($entity_type, array $properties = NULL, array $fields = NULL)</code>
+        - возвращает объект сущности по значениям её свойств и полей.<br />
       </p>
     ',
   );
@@ -297,19 +202,24 @@ function parser_job_form($form, &$form_state, $job) {
     
   // Properties & Fields
   foreach (($entity_properties + $entity_properties_fields) as $property_name => $property_info) {
-    if (!empty($property_info['computed']) || !isset($property_info['setter callback'])) {
+    $this_property_is_field = isset($property_info['field']);
+
+    if (
+      !empty($property_info['computed']) ||
+      !isset($property_info['setter callback']) ||
+      ($this_property_is_field && !isset($fields_info[$property_name]))
+    ) {
       continue;
     }
-    
+
     $fieldset_name = $property_name . '_fieldset';
     $field_type = isset($property_info['type']) ? $property_info['type'] : '';
-    $this_property_is_field = isset($property_info['field']);
     $this_property_is_multi_value = ($this_property_is_field && $fields_info[$property_name]['cardinality'] != 1);
-    
+
     if ($this_property_is_field && empty($fields_instances[$property_name])) {
       continue;
     }
-    
+
     $form['fields_wrapper']['fields_code'][$fieldset_name] = array(
       '#type' => 'fieldset',
       '#title' => $property_info['label'] . ' (' . $property_name . ')' . (!empty($property_info['required']) ? ' *' : ''),
@@ -418,7 +328,10 @@ function _parser_job_form_advanced_settings($job, $check_button) {
   $form['advanced_settings']['parse_limit'] = array(
     '#type' => 'textfield',
     '#title' => 'Ограничить число создаваемых/обновляемых сущностей',
-    '#description' => 'Максимальное число сущностей, которое сможет создать/обновить парсер. Применяется в осномном при тестировании задания. Оставьте пустым, если ограничения не нужны.',
+    '#description' => '
+      Максимальное число сущностей, которое сможет создать/обновить парсер. Применяется в осномном при тестировании
+      задания. Оставьте пустым, если ограничения не нужны.
+    ',
     '#default_value' => !empty($job->parse_limit) ? $job->parse_limit : '',
     '#size' => 5,
   );
@@ -426,12 +339,28 @@ function _parser_job_form_advanced_settings($job, $check_button) {
   $form['advanced_settings']['sleep'] = array(
     '#type' => 'textfield',
     '#title' => 'Задержка между http запросами',
-    '#description' => 'Количество секунд между http запросами к сайту источнику. Помогает обойти защиту от парсинга. По умолчанию задержка отсутствует.',
+    '#description' => '
+      Количество секунд между http запросами к сайту источнику. Помогает обойти защиту от парсинга. По умолчанию
+      задержка отсутствует.
+    ',
     '#default_value' => !empty($job->sleep) ? $job->sleep : 0,
     '#size' => 5,
     '#field_suffix' => 'сек.',
   );
-  
+
+  $form['advanced_settings']['run_period'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Периодичность запуска в фоне',
+    '#description' => '
+      Период фонового запуска парсера. Оставьте пустым, если не хотите запускать парсинг автоматически. Значение должно
+      быть не меньше периодичности запуска крона. Перед использованием опции, убедитесь, что cron запускается с помощью
+      crontab и период на странице <code>admin/config/system/cron</code> равен <i>Never</i>.
+    ',
+    '#default_value' => !empty($job->run_period) ? $job->run_period : '',
+    '#size' => 5,
+    '#field_suffix' => 'сек.',
+  );
+
   $form['advanced_settings']['site_charset'] = array(
     '#type' => 'select',
     '#title' => 'Кодировка сайта',
@@ -519,7 +448,27 @@ function _parser_job_form_advanced_settings($job, $check_button) {
       ),
     ),
   ) + $check_button;
-  
+
+  $form['advanced_settings']['init_code'] = array(
+    '#type' => 'textarea',
+    '#title' => 'Код предварительной инициализации',
+    '#description' => '
+      Код, который будет выполнен перед загрузкой стартового адреса. Например, здесь можно пройти авторизацию и сохранить
+      номер сессии в переменную с префиксом <code>parser_data_</code> для дальнейшего использования в HTTP заголовках.
+      Пример кода:<br />
+      <code>
+        $post_data = array(\'username\' => \'admin\', \'password\' => \'1234\');<br />
+        $result = _parser_post_request(\'http://example.com/login.php\', $post_data, array(\'max_redirects\' => 0));<br />
+        if (preg_match(\'#SessId=(.+?);#\', $result->headers[\'set-cookie\'], $matches)) {<br />
+        &nbsp;&nbsp;variable_set(\'parser_data_examplecom_sessid\', $matches[1]);<br />
+        }<br />
+      </code>
+    ',
+    '#default_value' => isset($job->init_code) ? $job->init_code : '',
+    '#rows' => 3,
+    '#resizable' => FALSE,
+  ) + $check_button;
+
   $form['advanced_settings']['prepare_code'] = array(
     '#type' => 'textarea',
     '#title' => 'Пост-обработка сущности',
@@ -539,7 +488,10 @@ function _parser_job_form_advanced_settings($job, $check_button) {
   $form['advanced_settings']['headers'] = array(
     '#type' => 'textarea',
     '#title' => 'HTTP заголовки',
-    '#description' => 'Заголовки, используемые кравлером.',
+    '#description' => '
+      Заголовки, используемые кравлером. В тексте можно использовать токены в формате <code>[parser_data_VARNAME]</code>,
+      которые будут заменены на значения, возвращаемые функцией <code>variable_get(\'parser_data_VARNAME\')</code>
+    ',
     '#default_value' => isset($job->headers) ? $job->headers : 'User-Agent: Opera/9.80 (Windows NT 6.1; U; ru) Presto/2.8.131 Version/11.10' . "\n",
   );
   
@@ -601,6 +553,9 @@ function parser_job_form_submit(&$form, &$form_state) {
   if (!$form_state['values']['parse_limit']) {
     $form_state['values']['parse_limit'] = 0;
   }
+  if (!$form_state['values']['run_period']) {
+    $form_state['values']['run_period'] = 0;
+  }
   
   $job = entity_ui_form_submit_build_entity($form, $form_state);
   $job->save();
@@ -627,10 +582,20 @@ function parser_run_batch($job, $redirect_to_job = FALSE, $resume = FALSE) {
   if (is_numeric($job)) {
     $job = parser_job_load($job);
   }
-  
+
+  if (!empty($job->clear_watchdog)) {
+    db_delete('watchdog')->execute();
+  }
+
   if (!$resume) {
+    watchdog('parser', 'Начался парсинг "' . $job->title . '"', NULL);
+
     _parser_url_delete_all($job->jid);
-    
+
+    if ($job->init_code) {
+      eval($job->init_code);
+    }
+
     $start_urls = explode("\n", trim($job->start_url));
     foreach ($start_urls as $start_url) {
       $start_url = trim($start_url);
@@ -648,10 +613,6 @@ function parser_run_batch($job, $redirect_to_job = FALSE, $resume = FALSE) {
     }
   }
 
-  if (!empty($job->clear_watchdog)) {
-    db_delete('watchdog')->execute();
-  }
-  
   batch_set(array(
     'title' => 'Парсинг',
     'progress_message' => '',
@@ -659,6 +620,7 @@ function parser_run_batch($job, $redirect_to_job = FALSE, $resume = FALSE) {
       array('parser_parse', array($job, $redirect_to_job)),
     ),
     'finished' => 'parser_finished',
+    'file' => drupal_get_path('module', 'parser') . '/parser.inc',
   ));
 }
 
@@ -864,7 +826,7 @@ function parser_parse($job, $redirect_to_job, &$context) {
   $last_error_file = $context['results']['files_from_http_error'] ? ' (последний: ' . check_plain($GLOBALS['parser']['stat']['last_error_file']) . ')' : '';
   $queue_pages = $context['sandbox']['max'] - $context['sandbox']['progress'];
   $elapsed_time = time() - $context['results']['time_start'];
-  $left_time = ($queue_pages / $context['sandbox']['progress']) * $elapsed_time;
+  $left_time = $context['sandbox']['progress'] ? ($queue_pages / $context['sandbox']['progress']) * $elapsed_time : 0;
   $messages = array(
     'Последняя обработанная страница' => '(' . $url->depth . ') ' . $page_url,
     'Обработано страниц'              => $context['sandbox']['progress'],
@@ -899,7 +861,7 @@ function parser_parse($job, $redirect_to_job, &$context) {
  * Site is parsed.
  */
 function parser_finished($success, $results, $operations) {
-  drupal_set_message('
+  $message = '
     ' . ($success ? 'Парсинг завершён' : 'Парсинг завершён с ошибками') . '.<br />
     Обработано страниц: ' . _parser_url_count($results['jid'], 1) . '<br />
     Скачано URL: ' . $results['files_from_http'] . '<br />
@@ -909,142 +871,940 @@ function parser_finished($success, $results, $operations) {
     Обновлено сущностей: ' . l($results['updated_entities'], 'admin/structure/parser_jobs/results/' . $results['jid']) . '<br />
     Затрачено времени: ' . gmdate('H:i:s', time() - $results['time_start']) . '<br />
     Новых сообщений в системном журнале: ' . l(_parser_get_watchdog_rows_count() - $results['messages_count'], 'admin/reports/dblog') . '<br />
-  ', $success ? 'status' : 'error');
-  
+  ';
+  drupal_set_message($message, $success ? 'status' : 'error');
+  watchdog('parser', $message, NULL, $success ? WATCHDOG_NOTICE : WATCHDOG_ERROR);
+
   if ($results['redirect_to_job']) {
     drupal_goto('admin/structure/parser_jobs/manage/' . $results['jid']);
   }
 }
 
 /**
- * Implements of hook_entity_delete().
- * Delete record from {parser_map} table.
+ * Menu callback. Check php code.
  */
-function parser_entity_delete($entity, $entity_type) {
-  $entity_id = entity_id($entity_type, $entity);
+function parser_check_code() {
+  $params = array('test_url', 'site_charset', 'charset_fix', 'field_name', 'field_value', 'list_mode_code', 'headers');
+  foreach ($params as $param) {
+    if (!isset($_POST[$param])) {
+      echo 'bad params';
+      return NULL;
+    }
+  }
+  
+  $GLOBALS['parser']['stat'] = array(
+    'files_from_http' => 0,
+    'files_from_http_error' => 0,
+    'files_from_cache' => 0,
+  );
+  $page = _parser_get_page_by_url($_POST['test_url'], $_POST['headers'], $_POST['site_charset']);
+  $page_url = $_POST['test_url'];
+  $doc = _parser_create_phpquery($page, $_POST['charset_fix']);
+  
+  if ($_POST['list_mode_code']) {
+    $elements = eval($_POST['list_mode_code']);
+    $element_html = current($elements);
+    $doc_element = _parser_create_phpquery($element_html, $_POST['charset_fix']);
+  }
+  
+  $result = eval($_POST['field_value']);
+  
+  echo print_r($result, TRUE);
+}
 
+/**
+ * Menu callback. Redirect to entity page.
+ */
+function parser_redirect($entity_type, $entity_id) {
+  $entity = entity_load_single($entity_type, $entity_id);
+  $uri = entity_uri($entity_type, $entity);
+  drupal_goto($uri['path'], $uri['options']);
+}
+
+/**
+ * Result page.
+ */
+function parser_result_page($job) {
+  $entity_info = entity_get_info($job->entity_type);
+  $label_key = isset($entity_info['entity keys']['label']) ? $entity_info['entity keys']['label'] : '';
+  $header = array(
+    array('data' => '№'),
+    array('data' => 'Entity ID (' . $entity_info['entity keys']['id'] . ')', 'field' => $entity_info['entity keys']['id']),
+    array('data' => 'Remote ID',                                             'field' => 'remote_id'),
+    array('data' => 'Label' . ($label_key ? ' (' . $label_key . ')' : ''),   'field' => $label_key),
+    array('data' => 'Original URL',                                          'field' => 'url'),
+  );
+  
   $query = db_select('parser_map', 'pm');
-  $query->fields('pm', array('jid'));
-  $query->innerJoin('parser_jobs', 'pj', 'pj.jid = pm.jid');
-  $query->condition('pj.entity_type', $entity_type);
-  $query->condition('pm.entity_id', $entity_id);
-  $jid = $query->execute()->fetchField();
+  $query->fields('pm', array('entity_id', 'url', 'remote_id'));
+  if ($label_key) {
+    $query->fields('e', array($label_key));
+  }
+  $query->innerJoin($entity_info['base table'], 'e', 'e.' . $entity_info['entity keys']['id'] . ' = pm.entity_id');
+  $query->condition('jid', $job->jid);
+  $query->extend('TableSort')->orderByHeader($header);
+  
+  $rows = array();
+  foreach ($query->execute() as $i => $row) {
+    $rows[] = array(
+      $i + 1,
+      l($row->entity_id, 'parser/redirect/' . $job->entity_type . '/' . $row->entity_id, array('alias' => TRUE)),
+      $row->remote_id,
+      $label_key ? $row->{$label_key} : '',
+      _parser_get_external_link($row->url),
+    );
+  }
+  
+  drupal_set_title('Сущности, созданные заданием "' . $job->title . '"');
+  
+  return array(
+    '#theme' => 'table',
+    '#header' => $header,
+    '#rows' => $rows,
+    '#empty' => 'Пусто...',
+  );
+}
+
+/**
+ * Rollback form.
+ */
+function parser_rollback_form($form, $form_state, $job) {
+  $form['jid'] = array(
+    '#type' => 'value',
+    '#value' => $job->jid,
+  );
+ 
+  return confirm_form(
+    $form,
+    'Вы действительно хотите удалить все созданные парсером сущности?',
+    'admin/structure/parser_jobs',
+    'Эта операция необратима.',
+    'Удалить',
+    'Отменить'
+  );
+}
+
+/**
+ * Rollback form submit callback.
+ */
+function parser_rollback_form_submit($form, &$form_state) {
+  drupal_set_time_limit(0);
+  
+  $job = parser_job_load($form_state['values']['jid']);
+  $deleted_count = 0;
+  
+  $query = db_select('parser_map', 'pm');
+  $query->fields('pm', array('entity_id'));
+  $query->condition('jid', $job->jid);
+  $result = $query->execute();
+  
+  foreach ($result as $row) {
+    entity_delete($job->entity_type, $row->entity_id);
+  }
+  
+  drupal_set_message('Удалено ' . $result->rowCount() . ' сущностей.');
+  
+  $form_state['redirect'] = 'admin/structure/parser_jobs';
+}
+
+/**
+ * Settings form.
+ */
+function parser_settings_form($form) {
+  $form['parser_show_source_link'] = array(
+    '#type' => 'checkbox',
+    '#title' => 'Показывать ссылку на источник на страницах созданных сущностей.',
+    '#default_value' => variable_get('parser_show_source_link', 1),
+  );
+  
+  $form['actions'] = array(
+    '#type' => 'actions',
+  );
+  
+  $form['actions']['submit'] = array(
+    '#type' => 'submit',
+    '#value' => 'Сохранить',
+  );
+  
+  return system_settings_form($form);
+}
+
+/**
+ * Return entity id by URL.
+ */
+function parser_get_entity_id_by_url($url, $jid = NULL, $element = NULL) {
+  $query = db_select('parser_map', 'pn')
+    ->fields('pn', array('entity_id'))
+    ->condition('url', $url)
+    ->range(0, 1);
+    
+  if ($jid) {
+    $query->condition('jid', $jid);
+  }
+  
+  if ($element === NULL) {
+    $query->isNull('element');
+  }
+  else {
+    $query->condition('element', $element);
+  }
+  
+  return $query->execute()->fetchField();
+}
+
+/**
+ * Return entity id by Page Key.
+ */
+function parser_get_entity_id_by_remote_id($remote_id, $jid = NULL) {
+  $query = db_select('parser_map', 'pn')
+    ->fields('pn', array('entity_id'))
+    ->condition('remote_id', $remote_id)
+    ->range(0, 1);
 
   if ($jid) {
-    db_delete('parser_map')
-      ->condition('jid', $jid)
-      ->condition('entity_id', $entity_id)
+    $query->condition('jid', $jid);
+  }
+  
+  return $query->execute()->fetchField();
+}
+
+/**
+ * Find files in html, download and change tag attribute.
+ */
+function _parser_download_files($html, $selector, $attr, $base_url, $path = 'public://') {
+  $doc = _parser_create_phpquery($html);
+  
+  foreach ($doc->find($selector) as $element) {
+    $file_url = parser_get_absolute_url($base_url, pq($element)->attr($attr));
+    $file_url_info = parse_url($file_url);
+    $local_file_name = ltrim($file_url_info['path'], '/');
+    $local_file_name = str_replace('/', '-', $local_file_name);
+    
+    if (!file_exists($path . '/' . $local_file_name)) {
+      // Download image to cache
+      $cache_file_uri = _parser_download_url_to_cache($file_url, array(), FALSE);
+      if (!$cache_file_uri) {
+        continue;
+      }
+      
+      // Copy image from cache
+      $file = _parser_copy_file($cache_file_uri, $path . '/' . $local_file_name);
+      if ($file) {
+        $file->status = FILE_STATUS_PERMANENT;
+        file_save($file);
+      }
+    }
+    
+    $new_atr = file_create_url($path . '/' . $local_file_name);
+    $new_atr = drupal_substr($new_atr, drupal_strlen($GLOBALS['base_root']));
+    pq($element)->attr($attr, $new_atr);
+  }
+  
+  return $doc->html();
+}
+
+/**
+ * Find img tag in html, download files and change src attribute.
+ */
+function parser_download_images($html, $base_url, $path = 'public://images') {
+  return _parser_download_files($html, 'img', 'src', $base_url, $path);
+}
+
+/**
+ * Find links in html, download files and change href attribute.
+ */
+function parser_download_links($html, $extensions, $base_url, $path = 'public://') {
+  $selectors = array();
+  foreach ($extensions as $extension) {
+    $selectors[] = 'a[href$=".' . $extension . '"]';
+  }
+  return _parser_download_files($html, implode(', ', $selectors), 'href', $base_url, $path);
+}
+
+/**
+ * Run job in background.
+ */
+function parser_run_in_background($jid) {
+  parser_run_batch($jid);
+  $batch = &batch_get();
+  $batch['progressive'] = FALSE;
+  batch_process('');
+}
+
+/**
+ * Return entity object by conditions.
+ * 
+ * @param $entity_type
+ *   The entity type to load, e.g. node, user or taxonomy_term.
+ * @param $properties
+ *   An associative array of properties values.
+ * @param $fields
+ *   An associative array of fields values.
+ * 
+ * Example:
+ * @code
+ * $node = parser_get_entity_by_conditions(
+ *   'node',
+ *   array('type' => 'article', 'title' => 'Foo'),
+ *   array('field_category' => array('tid' => 2))
+ * );
+ * $term = parser_get_entity_by_conditions(
+ *   'taxonomy_term',
+ *   array('name' => 'Foo', 'vid' => 3)
+ * );
+ * @endcode
+ */
+function parser_get_entity_by_conditions($entity_type, $properties = NULL, $fields = NULL) {
+  $query = new EntityFieldQuery();
+  $query->entityCondition('entity_type', $entity_type);
+  if ($properties) {
+    foreach ($properties as $name => $value) {
+      $query->propertyCondition($name, $value);
+    }
+  }
+  if ($fields) {
+    foreach ($fields as $name => $values) {
+      foreach ($values as $column => $value) {
+        $query->fieldCondition($name, $column, $value);
+      }
+    }
+  }
+  $query->range(0, 1);
+  $result = $query->execute();
+  if ($result) {
+    $id = key($result[$entity_type]);
+    return entity_load_single($entity_type, $id);
+  }
+}
+
+/**
+ * Return taxonomy term object by term name.
+ */
+function parser_get_term_by_name($term_name, $vid = NULL) {
+  $conditions = array('name' => $term_name);
+  if ($vid) {
+    $conditions['vid'] = $vid;
+  }
+  return parser_get_entity_by_conditions('taxonomy_term', $conditions);
+}
+
+/**
+ * Return entity id from feeds items.
+ */
+function parser_get_entity_id_from_feeds_items($importer_name, $guid) {
+  return db_select('feeds_item', 'fi')
+    ->fields('fi', array('entity_id'))
+    ->condition('fi.id', $importer_name)
+    ->condition('fi.guid', $guid)
+    ->range(0, 1)
+    ->execute()
+    ->fetchField();
+}
+
+/**
+ * Return array of elements value.
+ */
+function parser_get_pqelements_values($doc, $selector, $function = 'html', $map = 'trim') {
+  $values = array();
+  foreach ($doc->find($selector) as $element) {
+    $values[] = pq($element)->$function();
+  }
+  if ($map) {
+    $values = array_map($map, $values);
+  }
+  return $values;
+}
+
+/**
+ * Get URL info.
+ */
+function _parser_url_get($url, $jid) {
+  return db_select('parser_urls', 'pu')
+    ->fields('pu')
+    ->condition('pu.url', $url)
+    ->condition('pu.jid', $jid)
+    ->execute()
+    ->fetchObject();
+}
+
+/**
+ * Get first not parsed URL info.
+ */
+function _parser_url_get_not_parsed($jid) {
+  return db_select('parser_urls', 'pu')
+    ->fields('pu')
+    ->condition('pu.jid', $jid)
+    ->condition('pu.parsed', 0)
+    ->range(0, 1)
+    ->execute()
+    ->fetchObject();
+}
+
+/**
+ * Adding URL to database.
+ */
+function _parser_url_add($url, $jid, $depth = 0) {
+  if (!_parser_url_get($url, $jid) && strpos($url, 'xandeadx.ru') === FALSE) {
+    db_insert('parser_urls')
+      ->fields(array(
+        'url' => $url,
+        'jid' => $jid,
+        'depth' => $depth,
+      ))
       ->execute();
   }
 }
 
 /**
- * Implements of hook_entity_view().
- * Show link to original page. Only for admin.
+ * Mark URL as parsed.
  */
-function parser_entity_view($entity, $entity_type, $view_mode, $langcode) {
-  if ($view_mode == 'full' && $GLOBALS['user']->uid == 1 && variable_get('parser_show_source_link', 1)) {
-    module_load_include('inc', 'parser');
-    $entity_id = entity_id($entity_type, $entity);
-    $url = _parser_get_url_by_entity_id($entity_type, $entity_id);
-    if ($url) {
-      $entity->content['parser_url'] = array(
-        '#markup' => '<p>Контент спарсен со страницы ' . _parser_get_external_link($url) . '</p>', 
-        '#weight' => 100, 
-      );
-    }
-  }
+function _parser_url_mark_parsed($url, $jid) {
+  db_update('parser_urls')
+    ->fields(array('parsed' => 1))
+    ->condition('url', $url)
+    ->condition('jid', $jid)
+    ->execute();
 }
 
 /**
- * Implements of hook_form_FORM_ID_alter(): parser_job_overview_form.
+ * Delete all URLs from database.
  */
-function parser_form_parser_job_overview_form_alter(&$form, $form_state) {
-  module_load_include('inc', 'parser');
+function _parser_url_delete_all($jid) {
+  db_delete('parser_urls')
+    ->condition('jid', $jid)
+    ->execute();
+}
 
-  $form['table']['#header'][2]['colspan'] = 6;
+/**
+ * Get count not parsed URLs.
+ */
+function _parser_url_count($jid, $parsed = NULL) {
+  $query = db_select('parser_urls', 'pu')
+    ->condition('pu.jid', $jid);
+  if ($parsed !== NULL) {
+    $query->condition('pu.parsed', $parsed);
+  }
+  return $query->countQuery()->execute()->fetchField();
+}
 
-  foreach ($form['table']['#rows'] as &$row) {
-    $jid = $row[0]['data']['#name'];
-    $entity_count = _parser_get_entity_count($jid);
+/**
+ * Return page html by URL.
+ */
+function _parser_get_page_by_url($url, $headers = array(), $charset = 'auto', $force_download = FALSE) {
+  $page_cache_uri = _parser_download_url_to_cache($url, $headers, $force_download);
+  if (!$page_cache_uri) {
+    return NULL;
+  }
+  $page = file_get_contents($page_cache_uri);
+  
+  // Find charset
+  if ($charset == 'auto') {
+    if (preg_match('# content="text/html; charset=(.+)"#isU', $page, $matches)) {
+      $charset = $matches[1];
+    }
+  }
+  // Convert charset
+  if (drupal_strtolower($charset) != 'utf-8' && $charset != 'auto') {
+    $page = iconv($charset, 'UTF-8//IGNORE', $page);
+    $page = str_ireplace(
+      ' content="text/html; charset=' . $charset . '"',
+      ' content="text/html; charset=utf-8"',
+      $page
+    );
+  }
+      
+  return $page;
+}
 
-    if ($entity_count > 0) {
-      $row[] = l(t('results'), 'admin/structure/parser_jobs/results/' . $jid);
-      $row[] = l(t('rollback') . ' (' . $entity_count . ')', 'admin/structure/parser_jobs/rollback/' . $jid);
+/**
+ * Download remote url to cache and return cache uri.
+ */
+function _parser_download_url_to_cache($url, $headers = array(), $force_download = FALSE) {
+  $cache_uri = 'public://parser_cache/' . md5($url);
+  
+  if (!file_exists($cache_uri) || $force_download) {
+    if (!empty($GLOBALS['parser']['sleep'])) {
+      sleep($GLOBALS['parser']['sleep']);
+    }
+    
+    // Headers
+    if (is_string($headers)) {
+      $headers = _parser_get_headers_array($headers);
+    }
+    foreach ($headers as &$header) {
+      $header = preg_replace_callback('#\[(parser_data_.+?)\]#', '_parser_data_replace_callback', $header);
+    }
+    $request_options = array('headers' => $headers);
+
+    $result = drupal_http_request($url, $request_options);
+    if ($result->code == 303 && !empty($result->headers['location'])) {
+      $result = drupal_http_request($result->headers['location'], $request_options);
+    }
+    
+    if (!empty($result->error)) {
+      _parser_watchdog('Ошибка при закачке "' . check_plain($url) . '": ' . check_plain($result->error) . (isset($result->data) ? ', <b>Результат</b>: ' . check_plain(drupal_substr($result->data, 0, 1000)) : ''), NULL, WATCHDOG_ERROR);
+      $GLOBALS['parser']['stat']['files_from_http_error']++;
+      $GLOBALS['parser']['stat']['last_error_file'] = $url;
+      return NULL;
+    }
+    if (!$result->data) {
+      _parser_watchdog('Ошибка при закачке "' . check_plain($url) . '": сервер не возвратил данных.', NULL, WATCHDOG_ERROR);
+      $GLOBALS['parser']['stat']['files_from_http_error']++;
+      $GLOBALS['parser']['stat']['last_error_file'] = $url;
+      return NULL;
+    }
+    
+    file_unmanaged_save_data($result->data, $cache_uri, FILE_EXISTS_REPLACE);
+    $GLOBALS['parser']['stat']['files_from_http']++;
+  }
+  else {
+    $GLOBALS['parser']['stat']['files_from_cache']++;
+  }
+  
+  return $cache_uri;
+}
+
+/**
+ * Pre replace callback.
+ */
+function _parser_data_replace_callback($matches) {
+  return variable_get($matches[1]);
+}
+
+/**
+ * Add row in {parser_map} table.
+ */
+function _parser_map_save($record) {
+  db_merge('parser_map')
+    ->key(array('entity_id' => $record['entity_id']))
+    ->fields(array(
+      'jid' => $record['jid'],
+      'url' => $record['url'],
+      'element' => $record['element'],
+      'remote_id' => $record['remote_id'],
+    ))
+    ->execute();
+}
+
+/**
+ * Return URL by entity id.
+ */
+function _parser_get_url_by_entity_id($entity_type, $entity_id, $jid = NULL) {
+  $query = db_select('parser_map', 'pn');
+  $query->fields('pn', array('url'));
+  $query->innerJoin('parser_jobs', 'pj', 'pj.jid = pn.jid');
+  $query->condition('pj.entity_type', $entity_type);
+  $query->condition('pn.entity_id', $entity_id);
+    
+  if ($jid) {
+    $query->condition('jid', $jid);
+  }
+  
+  return $query->execute()->fetchField();
+}
+
+/**
+ * Return row count.
+ */
+function _parser_get_rows($text) {
+  $count = substr_count(trim($text), "\n") + 1;
+  if ($count < 3) {
+    $count = 3;
+  }
+  elseif ($count > 20) {
+    $count = 20;
+  }
+  return $count;
+}
+
+/**
+ * Set row count.
+ */
+function _parser_set_rows(&$form) {
+  foreach (element_children($form) as $element) {
+    if (isset($form[$element]['#type']) && $form[$element]['#type'] == 'textarea') {
+      $form[$element]['#rows'] = _parser_get_rows($form[$element]['#default_value']);
     }
     else {
-      $row[] = '';
-      $row[] = '';
+      _parser_set_rows($form[$element]);
     }
   }
 }
 
 /**
- * Implements of hook_library().
+ * Return absolute url by base and relative url (deprecated).
  */
-function parser_library() {
-  $parser_path = drupal_get_path('module', 'parser');
-    
-  $libraries['codemirror'] = array(
-    'title' => 'CodeMirror',
-    'website' => 'http://codemirror.net/',
-    'version' => '2.13',
-    'js' => array(
-      $parser_path . '/codemirror2/lib/codemirror.js' => array(),
-      $parser_path . '/codemirror2/mode/clike/clike.js' => array(),
-      $parser_path . '/codemirror2/mode/php/php.js' => array(),
-    ),
-    'css' => array(
-      $parser_path . '/codemirror2/lib/codemirror.css' => array(),
-      $parser_path . '/codemirror2/theme/default.css' => array(),
-    ),
-  );
+function _parser_get_full_url($relative_url, $base_url) {
+  $relative_url = trim($relative_url);
+  $relative_url = preg_replace('/#.*/', '', $relative_url);
+  $relative_url_parsed = parse_url($base_url);
+  if (!isset($relative_url_parsed['path'])) {
+    $relative_url_parsed['path'] = '/';
+  }
 
-  return $libraries;
+  // example: //wikimedia.org/dir/image.png
+  if (drupal_substr($relative_url, 0, 2) == '//') {
+    $relative_url = $relative_url_parsed['scheme'] . ':' . $relative_url;
+  }
+  // example: /dir/image.png
+  elseif (drupal_substr($relative_url, 0, 1) == '/') {
+    $relative_url = $relative_url_parsed['scheme'] . '://' . $relative_url_parsed['host'] . $relative_url;
+  }
+  // example: dir/image.png
+  elseif (!preg_match('#^[a-z]+://#', $relative_url)) {
+    $path = preg_replace('#/[^/]+$#', '', $relative_url_parsed['path']);
+    $path = trim($path, '/');
+    if ($path) {
+      $path .= '/';
+    }
+    $relative_url = $relative_url_parsed['scheme'] . '://' . $relative_url_parsed['host'] . '/' . $path . $relative_url;
+  }
+  
+  $relative_url = str_replace(' ', '+', $relative_url);
+  
+  return $relative_url;
 }
 
 /**
- * Implements hook_entity_property_info_alter().
+ * Return absolute url by base and relative url.
  */
-function parser_entity_property_info_alter(&$info) {
-  module_load_include('inc', 'parser');
+function parser_get_absolute_url($base_url, $relative_url) {
+  if (!function_exists('url_to_absolute')) {
+    require_once('AbsoluteUrl/url_to_absolute.php');
+  }
+  
+  if (preg_match('#^[a-z]+://[^/]+$#', $base_url)) {
+    $base_url .= '/';
+  }
+  
+  return url_to_absolute($base_url, $relative_url);
+}
 
-  foreach ($info as $entity_type => $properties) {
-    if (isset($properties['bundles'])) {
-      foreach ($properties['bundles'] as $bundle => $bundle_properties) {
-        foreach ($bundle_properties['properties'] as $property_name => $property_info) {
-          _parser_set_format_setter_callback($info[$entity_type]['bundles'][$bundle]['properties'][$property_name]);
+/**
+ * Create phpQuery object.
+ */
+function _parser_create_phpquery($html, $charset_fix = FALSE) {
+  require_once DRUPAL_ROOT . '/' . drupal_get_path('module', 'parser') . '/phpQuery/phpQuery/phpQuery.php';
+  return phpQuery::newDocumentHTML($html, $charset_fix ? 'utf8' : NULL);
+}
+
+/**
+ * Return example field structure.
+ */
+function _parser_get_field_structure($field_info, $spaces = 2) {
+  $strucure = '';
+  foreach ($field_info['property info'] as $property_name => $property_info) {
+    if (!isset($property_info['setter callback'])) {
+      continue;
+    }
+    $strucure .= str_repeat('&nbsp;', $spaces) . "'$property_name' => \${$property_name}, // " . $property_info['label'] . ' (' . $property_info['type'] . ', ' . (isset($property_info['required']) ? 'required' : 'optional') . ')<br />';
+  }
+  return $strucure;
+}
+
+/**
+ * Set entity property.
+ */
+function _parser_set_property($entity_wrapper, $property_name, $property_value, $property_is_compound, $property_is_multi_value, $property_info) {
+  // Multi-value compound property
+  if ($property_is_multi_value && $property_is_compound && $property_value) {
+    foreach ($property_value as $delta => $property_item) {
+      foreach ($property_item as $sub_property_name => $sub_property_value) {
+        try {
+          $entity_wrapper->{$property_name}[$delta]->{$sub_property_name} = $sub_property_value;
+        }
+        catch (Exception $e) {
+          _parser_watchdog('Ошибка при записи в $entity_wrapper->' . $property_name . '[\'' . $delta . '\']->' . $sub_property_name . ': ' . $e->getMessage(), $sub_property_value, WATCHDOG_ERROR);
         }
       }
     }
-
-    if (isset($properties['properties'])) {
-      foreach ($properties['properties'] as $property_name => $property_info) {
-        _parser_set_format_setter_callback($info[$entity_type]['properties'][$property_name]);
+  }
+  // Single-value compound property
+  else if (!$property_is_multi_value && $property_is_compound && $property_value) {
+    // Create value
+    if ($entity_wrapper->{$property_name}->value() === NULL && empty($property_info['auto creation'])) {
+      try {
+        $entity_wrapper->{$property_name} = $property_value;
       }
+      catch (Exception $e) {
+        _parser_watchdog('Ошибка при записи в $entity_wrapper->' . $property_name . ': ' . $e->getMessage(), $property_value, WATCHDOG_ERROR);
+      }
+    }
+    // Set value
+    else {
+      foreach ($property_value as $sub_property_name => $sub_property_value) {
+        try {
+          $entity_wrapper->{$property_name}->{$sub_property_name} = $sub_property_value;
+        }
+        catch (Exception $e) {
+          _parser_watchdog('Ошибка при записи в $entity_wrapper->' . $property_name . '->' . $sub_property_name . ': ' . $e->getMessage(), $sub_property_value, WATCHDOG_ERROR);
+        }
+      }
+    }
+  }
+  // Multi-value simple property
+  else if ($property_is_multi_value && !$property_is_compound && $property_value) {
+    foreach ($property_value as $delta => $property_item) {
+      try {
+        $entity_wrapper->{$property_name}[$delta] = $property_item;
+      }
+      catch (Exception $e) {
+        _parser_watchdog('Ошибка при записи в $entity_wrapper->' . $property_name . '[\'' . $delta . '\']: ' . $e->getMessage(), $property_item, WATCHDOG_ERROR);
+      }
+    }
+  }
+  // Single-value simple property
+  else if (!$property_is_multi_value && !$property_is_compound) {
+    try {
+      $entity_wrapper->{$property_name} = $property_value;
+    }
+    catch (Exception $e) {
+      _parser_watchdog('Ошибка при записи в $entity_wrapper->' . $property_name . ': ' . $e->getMessage(), $property_value, WATCHDOG_ERROR);
     }
   }
 }
 
 /**
- * Implements hook_cron().
+ * Add error to watchdog.
  */
-function parser_cron() {
-  $jids = db_select('parser_jobs', 'j')
-    ->fields('j', array('jid'))
-    ->condition('j.run_period', 0, '>')
-    ->where('j.last_run + j.run_period <= ' . REQUEST_TIME)
-    ->execute()
-    ->fetchCol();
+function _parser_watchdog($text, $object = NULL, $severity = WATCHDOG_NOTICE) {
+  if ($object !== NULL) {
+    $text .= '<br />Value:<pre>' . check_plain(print_r($object, TRUE)) . '</pre>';
+  }
+  if (!empty($GLOBALS['parser']['url'])) {
+    $text .= '<br />Remote URL: ' . $GLOBALS['parser']['url'];
+  }
 
-  if ($jids) {
-    module_load_include('inc', 'parser');
+  watchdog('parser', $text, NULL, $severity);
+}
 
-    foreach ($jids as $jid) {
-      $job = parser_job_load($jid);
-      $job->last_run = REQUEST_TIME;
-      entity_save('parser_job', $job);
-      parser_run_in_background($jid);
+/**
+ * Return entity type properties.
+ */
+function _parser_get_entity_properties($entity_type, $bundle) {
+  $entity_properties_and_fields = entity_get_property_info($entity_type);
+  $entity_properties = isset($entity_properties_and_fields['properties'])
+    ? $entity_properties_and_fields['properties']
+    : array();
+  $entity_properties_fields = isset($entity_properties_and_fields['bundles'][$bundle]['properties'])
+    ? $entity_properties_and_fields['bundles'][$bundle]['properties']
+    : array();
+  return array($entity_properties, $entity_properties_fields);
+}
+
+/**
+ * Copy file from cache and return file object.
+ */
+function _parser_copy_file($from_uri, $to_uri) {
+  $file = (object)array(
+    'uid' => $GLOBALS['user']->uid,
+    'uri' => $from_uri,
+    'filename' => drupal_basename($to_uri),
+    'filemime' => file_get_mimetype($from_uri),
+  );
+  $file_path = file_stream_wrapper_uri_normalize($to_uri);
+  $file = file_copy($file, $file_path);
+  if (!$file) {
+    _parser_watchdog('Ошибка при копировании файла <i>' . $file->uri  . '</i> в <i>' . $file_path . '</i>.', NULL, WATCHDOG_ERROR);
+  }
+  
+  return $file;
+}
+
+/**
+ * Return page links.
+ */
+function _parser_get_page_links($doc) {
+  $links = array();  
+  foreach ($doc->find('a') as $a) {
+    $href = pq($a)->attr('href');
+    
+    if (!$href) {
+      continue;
+    }
+    // Continue if $href == '#content'
+    if (drupal_substr($href, 0, 1) == '#') {
+      continue;
+    }
+    // Continue if $href == 'ftp://ftp.drupal.org'
+    if (preg_match('#^([a-z]+)://#', $href, $matches) && !in_array($matches[1], array('http', 'https'))) {
+      continue;
+    }
+    // Continue if $href == 'javascript:alert();'
+    if (strpos($href, 'javascript:') === 0 || strpos($href, 'mailto:') === 0) {
+      continue;
+    }
+    
+    // Remove hash
+    $href = preg_replace('/#.*$/', '', $href);
+    
+    $links[] = $href;
+  }
+  
+  return $links;
+}
+
+/**
+ * Return TRUE if URLs have same host.
+ */
+function _parser_check_urls_host($url1, $url2) {
+  $url1_host = preg_replace('#^www.#', '', parse_url($url1, PHP_URL_HOST));
+  $url2_host = preg_replace('#^www.#', '', parse_url($url2, PHP_URL_HOST));
+  if ($url1_host == $url2_host) {
+    return TRUE;
+  }
+}
+
+/**
+ * Return options for form element.
+ */
+function _parser_get_entity_type_options($entity_types) {
+  $options = array();
+  foreach ($entity_types as $entity_type => $entity_info) {
+    $options[$entity_type] = $entity_info['label'];
+  }
+  return $options;
+}
+
+/**
+ * Return options for form element.
+ */
+function _parser_get_bundle_options($bundles) {
+  $options = array();
+  foreach ($bundles as $bundle_name => $bundle_info) {
+    $options[$bundle_name] = $bundle_info['label'];
+  }
+  return $options;
+}
+
+/**
+ * Return rows count in {watchdog} table.
+ */
+function _parser_get_watchdog_rows_count() {
+  return db_select('watchdog')->countQuery()->execute()->fetchField();
+}
+
+/**
+ * Return options for drupal_http_request().
+ */
+function _parser_get_headers_array($headers) {
+  $headers_array = array();
+  foreach (explode("\n", $headers) as $header) {
+    $header = trim($header);
+    if ($header) {
+      list($name, $value) = explode(': ', $header);
+      $headers_array[$name] = $value;
     }
   }
+  return $headers_array;
+}
+
+/**
+ * Return last watchdog message.
+ */
+function _parser_get_last_watchdog_message() {
+  $message = db_select('watchdog', 'w')
+    ->fields('w', array('wid', 'message', 'variables', 'timestamp'))
+    ->orderBy('w.wid', 'DESC')
+    ->range(0, 1)
+    ->execute()
+    ->fetch();
+  $message->message = theme('dblog_message', array('event' => $message));
+  $message->time = format_date($message->timestamp, 'custom', 'H:i:s');
+  return $message;
+}
+
+/**
+ * Return link to external site.
+ */
+function _parser_get_external_link($url) {
+  return l($url, 'http://anonym.to/?' . $url, array(
+    'external' => TRUE,
+    'attributes' => array('target' => '_blank'),
+  ));
+}
+
+/**
+ * Set entity path.
+ */
+function _parser_set_entity_path(&$entity, $page_url) {
+  $page_url_parsed = parse_url($page_url);
+  $alias = trim($page_url_parsed['path'], '/');
+  $alias = str_replace('%20', ' ', $alias);
+  if (!path_load(array('alias' => $alias))) {
+    $entity->path = array(
+      'alias' => $alias,
+      'language' => LANGUAGE_NONE,
+      'pathauto' => 0,
+    );
+  }
+}
+
+/**
+ * Return TRUE if page need force download.
+ */
+function _parser_page_need_force_download($page_url, $job, $element) {
+  $force_download = FALSE;
+  if ($job->force_download && !$element) {
+    if ($job->force_download_list) {
+      $force_download = drupal_match_path($page_url, $job->force_download_list);
+    }
+    else {
+      $force_download = TRUE;
+    }
+  }
+  return $force_download;
+}
+
+/**
+ * Return file name.
+ */
+function _parser_get_file_name_from_url($path) {
+  $filename = drupal_basename($path);
+  return current(explode('?', $filename));
+}
+
+/**
+ * Return file extension.
+ */
+function _parser_get_file_extension_from_url($path) {
+  $ext = pathinfo($path, PATHINFO_EXTENSION);
+  $ext = current(explode('?', $ext));
+  return drupal_strtolower($ext);
+}
+
+/**
+ * Return entity count in {parser_map} table by jid.
+ */
+function _parser_get_entity_count($jid) {
+  return db_select('parser_map')
+    ->condition('jid', $jid)
+    ->countQuery()
+    ->execute()
+    ->fetchField();
+}
+
+/**
+ * Set setter callback for 'format' property.
+ */
+function _parser_set_format_setter_callback(&$property_info) {
+  if (
+    isset($property_info['type']) &&
+    ($property_info['type'] == 'text_formatted' || $property_info['type'] == 'list<text_formatted>') &&
+    isset($property_info['property info']['format']) && 
+    !isset($property_info['property info']['format']['setter callback'])
+  ) {
+    $property_info['property info']['format']['setter callback'] = 'entity_property_verbatim_set';
+  }
+}
+
+/**
+ * Send POST http request.
+ */
+function _parser_post_request($url, array $data, array $options = array()) {
+  return drupal_http_request($url, $options + array(
+    'headers' => array('Content-Type' => 'application/x-www-form-urlencoded'),
+    'method' => 'POST',
+    'data' => drupal_http_build_query($data),
+  ));
 }

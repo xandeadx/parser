@@ -1469,15 +1469,13 @@ function _parser_get_full_url($relative_url, $base_url) {
  * Return absolute url by base and relative url.
  */
 function parser_get_absolute_url($base_url, $relative_url) {
-  if (!function_exists('url_to_absolute')) {
-    require_once('AbsoluteUrl/url_to_absolute.php');
-  }
-  
+  require_once DRUPAL_ROOT . '/' . drupal_get_path('module', 'parser') . '/phpuri/phpuri.php';
+
   if (preg_match('#^[a-z]+://[^/]+$#', $base_url)) {
     $base_url .= '/';
   }
-  
-  return url_to_absolute($base_url, $relative_url);
+
+  return phpUri::parse($base_url)->join($relative_url);
 }
 
 /**

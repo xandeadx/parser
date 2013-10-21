@@ -133,7 +133,7 @@ function _parser_prepare_field_file(&$result, $field_info, $field_instance, $ent
   // Validate by extensions
   $allowed_file_extensions = explode(' ', $field_instance['settings']['file_extensions']);
   if ($allowed_file_extensions && !in_array($file_ext, $allowed_file_extensions)) {
-    _parser_watchdog('Файл <i>' . check_plain($file_url) . '</i> закачан не будет, так как его тип не в списке допустимых.');
+    _parser_watchdog('Файл "<i>' . check_plain($file_url) . '</i>" закачан не будет, так как его тип "<i>' . check_plain($file_ext) . '</i>" не в списке допустимых.');
     $result = NULL;
     return;
   }

@@ -270,10 +270,7 @@ function parser_install() {
       '*.jpg' . "\n" .
       '*.zip' . "\n" .
       '*.tar.gz',
-    'check_code' => '' .
-      'if ($doc->find(\'a[href="/project/themes"].active\')->length() && $doc->find(\'.view-project-release-download-table\')->length()) {' . "\n" .
-      '  return TRUE;' . "\n" .
-      '}',
+    'check_code' => 'return $doc->find(\'body\')->hasClass(\'node-type-project-theme\');',
     'site_charset' => 'auto',
     'charset_fix' => 0,
     'entity_type' => 'node',
@@ -287,10 +284,8 @@ function parser_install() {
     'fields_code' => array(
       'title' => 'return $doc->find(\'h1#page-subtitle\')->text();',
       'body' => '' .
-        '$content = $doc->find(\'.node-content\')->clone();' . "\n" .
-        '$content->find(\'.field-type-filefield\')->remove();' . "\n" .
         'return array(' . "\n" .
-        '  \'value\' => $content->html(),' . "\n" .
+        '  \'value\' => $doc->find(\'.field-name-body .field-item\')->html(),' . "\n" .
         '  \'format\' => \'full_html\',' . "\n" .
         ');',
       'field_tags' => '' .
@@ -301,7 +296,7 @@ function parser_install() {
         'return $terms;',
       'field_image' => '' . 
         'return array(' . "\n" . 
-        '  \'file\' => $doc->find(\'.field-field-project-images a:first\')->attr(\'href\'),' . "\n" .
+        '  \'file\' => $doc->find(\'.field-name-field-project-images a:first\')->attr(\'href\'),' . "\n" .
         ');',
       'author' => 'return 1;',
     ),

@@ -506,7 +506,8 @@ function _parser_job_form_advanced_settings($job, $check_button) {
     '#type' => 'checkbox',
     '#title' => 'Очистить системный журнал',
     '#description' => 'Отметьте, если хотите очистить системный журнал (watchdog) перед началом парсинга.',
-    '#default_value' => TRUE,
+    '#default_value' => module_exists('dblog'),
+    '#disabled' => !module_exists('dblog'),
   );
   
   return $form;
@@ -1683,6 +1684,9 @@ function _parser_get_bundle_options($bundles) {
  * Return rows count in {watchdog} table.
  */
 function _parser_get_watchdog_rows_count() {
+  if (!module_exists('dblog')) {
+    return 0;
+  }
   return db_select('watchdog')->countQuery()->execute()->fetchField();
 }
 
@@ -1705,6 +1709,9 @@ function _parser_get_headers_array($headers) {
  * Return last watchdog message.
  */
 function _parser_get_last_watchdog_message() {
+  if (!module_exists('dblog')) {
+    return '';
+  }
   $message = db_select('watchdog', 'w')
     ->fields('w', array('wid', 'message', 'variables', 'timestamp'))
     ->orderBy('w.wid', 'DESC')

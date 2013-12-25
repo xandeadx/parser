@@ -4,11 +4,28 @@
  * Prepare field type "text"
  */
 function _parser_prepare_field_text(&$result, $field_info, $field_instance, $entity, $job, $base_url) {
-  $result = trim($result);
-  if (!empty($field_info['settings']['max_length']) && drupal_strlen($result) > $field_info['settings']['max_length']) {
-    $original_result = $result;
-    $result = drupal_substr($result, 0, $field_info['settings']['max_length']);
-    _parser_watchdog('Обрезан текст в поле "' . $field_info['field_name'] . '": "<i>' . check_plain($original_result) . '</i>" => "<i>' . check_plain($result) . '</i>".');
+  if ($field_instance['settings']['text_processing']) {
+    if (is_string($result)) {
+      $result = array('value' => $result);
+    }
+    if (empty($result['format'])) {
+      $result['format'] = 'filtered_html';
+    }
+    $result_value = &$result['value'];
+  }
+  else {
+    $result_value = &$result;
+  }
+
+  $result_value = trim($result_value);
+  if (!empty($field_info['settings']['max_length']) && drupal_strlen($result_value) > $field_info['settings']['max_length']) {
+    $original_result = $result_value;
+    $result_value = drupal_substr($result_value, 0, $field_info['settings']['max_length']);
+    _parser_watchdog('
+      Обрезан текст в поле "' . $field_info['field_name'] . '":
+      "<i>' . check_plain($original_result) . '</i>" =>
+      "<i>' . check_plain($result_value) . '</i>".
+    ');
   }
 }
 

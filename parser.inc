@@ -668,7 +668,8 @@ function parser_parse($job, $redirect_to_job, &$context) {
       $elements = array_values($elements); // Re-numbered elements
       $context['sandbox']['element'] = ($context['sandbox']['element'] === NULL) ? 0 : $context['sandbox']['element'] + 1;
       $element_html = $elements[$context['sandbox']['element']];
-      $doc_element = _parser_create_phpquery($element_html, $job->charset_fix);
+      if (is_string($element_html))
+        $doc_element = _parser_create_phpquery($element_html, $job->charset_fix);
     }
   }
   
@@ -905,7 +906,8 @@ function parser_check_code() {
   if ($_POST['list_mode_code']) {
     $elements = eval($_POST['list_mode_code']);
     $element_html = current($elements);
-    $doc_element = _parser_create_phpquery($element_html, $_POST['charset_fix']);
+    if (is_string($element_html))
+      $doc_element = _parser_create_phpquery($element_html, $_POST['charset_fix']);
   }
   
   $result = eval($_POST['field_value']);

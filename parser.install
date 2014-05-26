@@ -253,8 +253,6 @@ function parser_schema() {
  * Implementation of hook_install().
  */
 function parser_install() {
-  $cache_dir = 'public://parser_cache';
-  file_prepare_directory($cache_dir, FILE_CREATE_DIRECTORY);
   entity_create('parser_job', array(
     'title' => 'Парсинг шаблонов с drupal.org',
     'start_url' => 'http://drupal.org/project/themes',

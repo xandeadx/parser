@@ -614,6 +614,9 @@ function parser_run_batch($job, $redirect_to_job = FALSE, $resume = FALSE) {
     }
   }
 
+  $cache_dir = 'public://parser_cache';
+  file_prepare_directory($cache_dir, FILE_CREATE_DIRECTORY);
+
   batch_set(array(
     'title' => 'Парсинг',
     'progress_message' => '',

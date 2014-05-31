@@ -49,8 +49,8 @@ function parser_job_form($form, &$form_state, $job) {
     '#type' => 'textarea',
     '#title' => 'Стартовый URL',
     '#description' => '
-      Адрес, с которого парсер начнёт работу. Пример заполнения: <code>http://drupal.org/project/modules</code><br />
-      В адресе можно использовать маску для числовых значений в формате <code>[mask:min,max]</code>, например: <code>http://drupal.org/project/modules?page=[mask:0,890]</code><br />
+      Адрес, с которого парсер начнёт работу. Пример заполнения: <code>https://drupal.org/project/project_theme</code><br />
+      В адресе можно использовать маску для числовых значений в формате <code>[mask:min,max]</code>, например: <code>https://drupal.org/project/project_theme?page=[mask:0,49]</code><br />
       В поле можно указать несколько адресов, каждый на новой строке.
     ',
     '#required' => TRUE,

@@ -614,8 +614,7 @@ function parser_run_batch($job, $redirect_to_job = FALSE, $resume = FALSE) {
     }
   }
 
-  $cache_dir = 'public://parser_cache';
-  file_prepare_directory($cache_dir, FILE_CREATE_DIRECTORY);
+  _parser_prepare_cache_directory();
 
   batch_set(array(
     'title' => 'Парсинг',
@@ -895,7 +894,9 @@ function parser_check_code() {
       return NULL;
     }
   }
-  
+
+  _parser_prepare_cache_directory();
+
   $GLOBALS['parser']['stat'] = array(
     'files_from_http' => 0,
     'files_from_http_error' => 0,
@@ -1819,4 +1820,12 @@ function _parser_post_request($url, array $data, array $options = array()) {
     'method' => 'POST',
     'data' => drupal_http_build_query($data),
   ));
+}
+
+/**
+ * Create cache directory if not exist.
+ */
+function _parser_prepare_cache_directory() {
+  $cache_dir = 'public://parser_cache';
+  file_prepare_directory($cache_dir, FILE_CREATE_DIRECTORY);
 }

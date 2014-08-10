@@ -188,11 +188,13 @@ function parser_job_form($form, &$form_state, $job) {
       <p>
         Полезные функции:<br />
         <code>parser_get_pqelements_values($doc, $selector, $function = \'html\', $map = \'trim\')</code>
-        - возвращает массив значений элементов.<br />
+          - возвращает массив значений элементов.<br />
         <code>parser_get_entity_id_by_remote_id($remote_id, $job_id = NULL)</code>
-        - возвращает id созданной сущности по Remote ID.<br />
+          - возвращает id созданной сущности по Remote ID.<br />
         <code>parser_get_entity_by_conditions($entity_type, array $properties = NULL, array $fields = NULL)</code>
-        - возвращает объект сущности по значениям её свойств и полей.<br />
+          - возвращает объект сущности по значениям её свойств и полей.<br />
+        <code>parser_create_terms_hierarchy($terms, $vocabulary)</code>
+          - создаёт иерархию терминов
       </p>
     ',
   );
@@ -1185,12 +1187,23 @@ function parser_get_entity_by_conditions($entity_type, $properties = NULL, $fiel
 /**
  * Return taxonomy term object by term name.
  */
-function parser_get_term_by_name($term_name, $vid = NULL) {
-  $conditions = array('name' => $term_name);
-  if ($vid) {
-    $conditions['vid'] = $vid;
+function parser_get_term_by_name($term_name, $vocabulary = NULL, $parent_tid = NULL) {
+  $query = db_select('taxonomy_term_data', 'ttd');
+  $query->fields('ttd', array('tid'));
+  $query->condition('ttd.name', $term_name);
+  $query->range(0, 1);
+  if ($vocabulary !== NULL) {
+    if (!is_numeric($vocabulary)) {
+      $vocabulary = taxonomy_vocabulary_machine_name_load($vocabulary)->vid;
+    }
+    $query->condition('ttd.vid', $vocabulary);
   }
-  return parser_get_entity_by_conditions('taxonomy_term', $conditions);
+  if ($parent_tid !== NULL) {
+    $query->innerJoin('taxonomy_term_hierarchy', 'tth', 'tth.tid = ttd.tid');
+    $query->condition('tth.parent', $parent_tid);
+  }
+  $tid = $query->execute()->fetchField();
+  return $tid ? taxonomy_term_load($tid) : $tid;
 }
 
 /**
@@ -1218,6 +1231,29 @@ function parser_get_pqelements_values($doc, $selector, $function = 'html', $map 
     $values = array_map($map, $values);
   }
   return $values;
+}
+
+/**
+ * Create terms hierarchy.
+ */
+function parser_create_terms_hierarchy($terms, $vocabulary) {
+  if (!is_numeric($vocabulary)) {
+    $vocabulary = taxonomy_vocabulary_machine_name_load($vocabulary)->vid;
+  }
+
+  $terms_with_tids = array();
+  $parent_tid = 0;
+  foreach ($terms as $term_name) {
+    $term = parser_get_term_by_name($term_name, $vocabulary, $parent_tid);
+    if (!$term) {
+      $term = (object)array('vid' => $vocabulary, 'name' => $term_name, 'parent' => $parent_tid);
+      taxonomy_term_save($term);
+    }
+    $terms_with_tids[$term->tid] = $term->name;
+    $parent_tid = $term->tid;
+  }
+
+  return $terms_with_tids;
 }
 
 /**

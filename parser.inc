@@ -1552,12 +1552,24 @@ function _parser_set_property($entity_wrapper, $property_name, $property_value, 
   // Multi-value compound property
   if ($property_is_multi_value && $property_is_compound && $property_value) {
     foreach ($property_value as $delta => $property_item) {
-      foreach ($property_item as $sub_property_name => $sub_property_value) {
+      // Create value
+      if ($entity_wrapper->{$property_name}[$delta]->value() === NULL && empty($property_info['auto creation'])) {
         try {
-          $entity_wrapper->{$property_name}[$delta]->{$sub_property_name} = $sub_property_value;
+          $entity_wrapper->{$property_name}[$delta] = $property_item;
         }
         catch (Exception $e) {
-          _parser_watchdog('Ошибка при записи в $entity_wrapper->' . $property_name . '[\'' . $delta . '\']->' . $sub_property_name . ': ' . $e->getMessage(), $sub_property_value, WATCHDOG_ERROR);
+          _parser_watchdog('Ошибка при записи в $entity_wrapper->' . $property_name . '[\'' . $delta . '\']: ' . $e->getMessage(), $property_value, WATCHDOG_ERROR);
+        }
+      }
+      // Set value
+      else {
+        foreach ($property_item as $sub_property_name => $sub_property_value) {
+          try {
+            $entity_wrapper->{$property_name}[$delta]->{$sub_property_name} = $sub_property_value;
+          }
+          catch (Exception $e) {
+            _parser_watchdog('Ошибка при записи в $entity_wrapper->' . $property_name . '[\'' . $delta . '\']->' . $sub_property_name . ': ' . $e->getMessage(), $sub_property_value, WATCHDOG_ERROR);
+          }
         }
       }
     }

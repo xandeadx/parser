@@ -1558,7 +1558,7 @@ function _parser_set_property($entity_wrapper, $property_name, $property_value, 
           $entity_wrapper->{$property_name}[$delta] = $property_item;
         }
         catch (Exception $e) {
-          _parser_watchdog('Ошибка при записи в $entity_wrapper->' . $property_name . '[\'' . $delta . '\']: ' . $e->getMessage(), $property_value, WATCHDOG_ERROR);
+          _parser_watchdog('Ошибка при записи в $entity_wrapper->' . $property_name . '[\'' . $delta . '\']: ' . $e->getMessage(), $property_item, WATCHDOG_ERROR);
         }
       }
       // Set value

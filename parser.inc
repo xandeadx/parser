@@ -492,7 +492,7 @@ function _parser_job_form_advanced_settings($job, $check_button) {
     '#title' => 'HTTP заголовки',
     '#description' => '
       Заголовки, используемые кравлером. В тексте можно использовать токены в формате <code>[parser_data_VARNAME]</code>,
-      которые будут заменены на значения, возвращаемые функцией <code>variable_get(\'parser_data_VARNAME\')</code>
+      которые будут заменены на значения, возвращаемые функцией <code>variable_get(\'parser_data_VARNAME\')</code>, например: <code>Cookie: SessId=[parser_data_examplecom_sessid]</code>
     ',
     '#default_value' => isset($job->headers) ? $job->headers : 'User-Agent: Opera/9.80 (Windows NT 6.1; U; ru) Presto/2.8.131 Version/11.10' . "\n",
   );

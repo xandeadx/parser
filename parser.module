@@ -104,19 +104,8 @@ function parser_job_uri($job) {
  */
 function parser_entity_delete($entity, $entity_type) {
   $entity_id = entity_id($entity_type, $entity);
-
-  $query = db_select('parser_map', 'pm');
-  $query->fields('pm', array('jid'));
-  $query->innerJoin('parser_jobs', 'pj', 'pj.jid = pm.jid');
-  $query->condition('pj.entity_type', $entity_type);
-  $query->condition('pm.entity_id', $entity_id);
-  $jid = $query->execute()->fetchField();
-
-  if ($jid) {
-    db_delete('parser_map')
-      ->condition('jid', $jid)
-      ->condition('entity_id', $entity_id)
-      ->execute();
+  if ($jid = _parser_map_get_jid($entity_type, $entity_id)) {
+    _parser_map_delete($jid, $entity_id);
   }
 }
 

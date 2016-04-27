@@ -93,11 +93,14 @@ function _parser_prepare_field_taxonomy_term_reference(&$result, $field_info, $f
       return;
     }
 
-    $voc_machine_name = $field_info['settings']['allowed_values'][0]['vocabulary'];
-    $vid = taxonomy_vocabulary_machine_name_load($voc_machine_name)->vid;
+    $vocabulary_machine_name = $field_info['settings']['allowed_values'][0]['vocabulary'];
+    $vid = taxonomy_vocabulary_machine_name_load($vocabulary_machine_name)->vid;
     $term = parser_get_term_by_name($term_name, $vid);
     if (!$term) {
-      $term = (object)array('vid' => $vid, 'name' => $term_name);
+      $term = (object)array(
+        'vid' => $vid,
+        'name' => $term_name,
+      );
       taxonomy_term_save($term);
     }
 

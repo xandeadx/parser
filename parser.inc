@@ -1398,12 +1398,16 @@ function _parser_get_page_by_url($url, $headers = array(), $charset = 'auto', $f
  * Download remote url to cache and return cache uri.
  */
 function _parser_download_url_to_cache($url, $headers = array(), $force_download = FALSE) {
-  $cache_uri = 'public://parser_cache/' . md5($url);
+  $url_md5 = md5($url);
+  $cache_dir = 'public://parser_cache/' . drupal_substr($url_md5, 0, 2);
+  $cache_uri = $cache_dir . '/' . $url_md5;
 
   if (!file_exists($cache_uri) || $force_download) {
     if (!empty($GLOBALS['parser']['sleep'])) {
       sleep($GLOBALS['parser']['sleep']);
     }
+
+    file_prepare_directory($cache_dir, FILE_CREATE_DIRECTORY);
 
     // Headers
     if (is_string($headers)) {

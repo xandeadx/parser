@@ -573,3 +573,19 @@ function parser_update_7219() {
   ));
   drupal_flush_all_caches();
 }
+
+/**
+ * Reorganize cached files.
+ */
+function parser_update_7220() {
+  $cache_uri = 'public://parser_cache';
+  $files = scandir($cache_uri);
+  foreach ($files as $file) {
+    if ($file == '.' || $file == '..' || is_dir($cache_uri . '/' . $file)) {
+      continue;
+    }
+    $new_dir = $cache_uri . '/' . drupal_substr($file, 0, 2);
+    file_prepare_directory($new_dir, FILE_CREATE_DIRECTORY);
+    file_unmanaged_move($cache_uri . '/' . $file, $new_dir . '/' . $file);
+  }
+}

@@ -103,6 +103,7 @@ function parser_job_uri($job) {
  * Delete record from {parser_map} table.
  */
 function parser_entity_delete($entity, $entity_type) {
+  module_load_include('inc', 'parser');
   $entity_id = entity_id($entity_type, $entity);
   if ($jid = _parser_map_get_jid($entity_type, $entity_id)) {
     _parser_map_delete($jid, $entity_id);

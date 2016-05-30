@@ -1421,8 +1421,8 @@ function _parser_download_url_to_cache($url, $headers = array(), $force_download
     $result = drupal_http_request($url, $request_options);
 
     // Processing redirect
-    if ($result->code == 303 && !empty($result->headers['location'])) {
-      $url = $result->headers['location'];
+    if (!empty($result->redirect_url)) {
+      $url = parser_get_absolute_url($url, $result->redirect_url);
       $result = drupal_http_request($url, $request_options);
     }
 

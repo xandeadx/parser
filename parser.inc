@@ -663,7 +663,7 @@ function parser_parse($job, $redirect_to_job, &$context) {
   $page = _parser_url_allowed($page_url, $job) ? _parser_get_page_by_url($page_url, $job->headers, $job->site_charset, $force_download) : '';
   $doc = _parser_create_phpquery($page, $job->charset_fix);
   $base = $doc->find('base')->attr('href');
-  $base_url = $base ? $base : $page_url;
+  $base_url = $base ? parser_get_absolute_url($page_url, $base) : $page_url;
   $entity_id = NUll;
   
   // If list mode enabled

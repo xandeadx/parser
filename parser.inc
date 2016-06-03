@@ -87,7 +87,8 @@ function parser_job_form($form, &$form_state, $job) {
     '#title' => 'Белый список адресов',
     '#description' => '
       Маски адресов, по которым будет разрешено ходить парсеру. Каждая маска на новой строке. Оставьте пустым, если
-      парсеру разрешено ходить по всем найденным ссылкам. Пример заполнения: <code>http://drupal.org/project/*</code>
+      парсеру разрешено ходить по всем найденным ссылкам. Регулярные выражения заключаются в символ <code>#</code>.
+      Пример заполнения: <code>http://drupal.org/project/*</code> или <code>#/project/(uc|dc|commerce)_#</code>
     ',
     '#default_value' => isset($job->white_list) ? $job->white_list : '',
     '#rows' => 3,
@@ -97,10 +98,21 @@ function parser_job_form($form, &$form_state, $job) {
     '#type' => 'textarea',
     '#title' => 'Чёрный список адресов',
     '#description' => '
-      Маски адресов, по которым будет запрещено ходить парсеру. Каждая маска на новой строке. Пример заполнения:
-      <code>http://drupal.org/project/uc_*</code>
+      Маски адресов, по которым будет запрещено ходить парсеру. Каждая маска на новой строке. Регулярные выражения
+      заключаются в символ <code>#</code>. Пример заполнения: <code>http://drupal.org/project/uc_*</code> или
+      <code>#/project/(uc|dc|commerce)_#</code>
     ',
-    '#default_value' => isset($job->black_list) ? $job->black_list : implode("\n", array('*.jpg', '*.png', '*.zip', '*.rar', '*.pdf')),
+    '#default_value' => isset($job->black_list) ? $job->black_list : implode("\n", array(
+      '*.jpg',
+      '*.png',
+      '*.gif',
+      '*.zip',
+      '*.rar',
+      '*.pdf',
+      '*.doc',
+      '*.xls',
+      '*.txt',
+    )),
     '#rows' => 3,
   );
   
@@ -296,7 +308,7 @@ function parser_job_form($form, &$form_state, $job) {
     '#value' => 'Сохранить и Начать',
   );
   
-  if (!empty($job->jid) && _parser_url_count($job->jid, 0)) {
+  if (!empty($job->jid) && _parser_url_count($job->jid, array(0, 2))) {
     $form['actions']['submit_and_resume'] = array(
       '#type' => 'submit',
       '#value' => 'Сохранить и Продолжить',
@@ -503,7 +515,13 @@ function _parser_job_form_advanced_settings($job, $check_button) {
     '#description' => '',
     '#value' => '',
   );
-  
+
+  $form['advanced_settings']['resume_errors'] = array(
+    '#type' => 'checkbox',
+    '#title' => 'Повторно обойти ошибочные адреса',
+    '#default_value' => FALSE,
+  );
+
   $form['advanced_settings']['clear_watchdog'] = array(
     '#type' => 'checkbox',
     '#title' => 'Очистить системный журнал',
@@ -590,7 +608,16 @@ function parser_run_batch($job, $redirect_to_job = FALSE, $resume = FALSE) {
     db_delete('watchdog')->execute();
   }
 
-  if (!$resume) {
+  if ($resume) {
+    if (!empty($job->resume_errors)) {
+      db_update('parser_urls')
+        ->fields(array('parsed' => 0))
+        ->condition('jid', $job->jid)
+        ->condition('parsed', 2)
+        ->execute();
+    }
+  }
+  else {
     watchdog('parser', 'Начался парсинг "' . $job->title . '"', NULL);
 
     _parser_url_delete_all($job->jid);
@@ -632,11 +659,11 @@ function parser_run_batch($job, $redirect_to_job = FALSE, $resume = FALSE) {
 /**
  * Parse page.
  */
-function parser_parse($job, $redirect_to_job, &$context) {
+function parser_parse($job, $redirect_to_job = FALSE, &$context = array()) {
   drupal_set_time_limit(0);
   
   if (empty($context['sandbox'])) {
-    $context['sandbox']['progress'] = _parser_url_count($job->jid, 1);
+    $context['sandbox']['progress'] = _parser_url_count($job->jid, array(1, 2));
     $context['sandbox']['entity_ids'] = array();
     $context['sandbox']['created_entities'] = 0;
     $context['sandbox']['element'] = NULL;
@@ -665,6 +692,7 @@ function parser_parse($job, $redirect_to_job, &$context) {
   $base = $doc->find('base')->attr('href');
   $base_url = $base ? parser_get_absolute_url($page_url, $base) : $page_url;
   $entity_id = NUll;
+  $entity_save_error = FALSE;
   
   // If list mode enabled
   $elements = NULL;
@@ -796,7 +824,8 @@ function parser_parse($job, $redirect_to_job, &$context) {
     }
     catch (Exception $e) {
       _parser_watchdog('Ошибка при сохранении сущности: ' . $e->getMessage() . '. <b>Адрес:</b> ' . check_plain($page_url), $entity, WATCHDOG_ERROR);
-      $context['sandbox']['not_created_entities']++;
+      $context['results']['not_created_entities']++;
+      $entity_save_error = TRUE;
     }
     
     if ($entity_id = $entity_wrapper->getIdentifier()) {
@@ -814,7 +843,8 @@ function parser_parse($job, $redirect_to_job, &$context) {
   }
   
   if (!$elements || $context['sandbox']['element'] >= count($elements) - 1) {
-    _parser_url_mark_parsed($page_url, $job->jid);
+    $url_status = ($page === NULL || $entity_save_error) ? 2 : 1;
+    _parser_url_mark_parsed($page_url, $job->jid, $url_status);
     $context['sandbox']['progress']++;
     $context['sandbox']['element'] = NULL;
   }
@@ -843,8 +873,7 @@ function parser_parse($job, $redirect_to_job, &$context) {
     'Новых системных сообщений'              => _parser_get_system_message_count(),
     'Новых сообщений в watchdog'             => l($new_watchdog_row_count, 'admin/reports/dblog', array('attributes' => array('target' => '_blank'))),
   );
-  if ($new_watchdog_row_count) {
-    $last_watchdog_message = _parser_get_last_watchdog_message();
+  if ($new_watchdog_row_count && $last_watchdog_message = _parser_get_last_watchdog_message()) {
     $last_watchdog_message_link = l($last_watchdog_message->time, 'admin/reports/event/' . $last_watchdog_message->wid, array('attributes' => array('target' => '_blank')));
     $messages['Последнее сообщение'] = '(' . $last_watchdog_message_link . ') ' . $last_watchdog_message->message;
   }
@@ -1209,19 +1238,6 @@ function parser_get_term_by_name($term_name, $vocabulary = NULL, $parent_tid = N
 }
 
 /**
- * Return entity id from feeds items.
- */
-function parser_get_entity_id_from_feeds_items($importer_name, $guid) {
-  return db_select('feeds_item', 'fi')
-    ->fields('fi', array('entity_id'))
-    ->condition('fi.id', $importer_name)
-    ->condition('fi.guid', $guid)
-    ->range(0, 1)
-    ->execute()
-    ->fetchField();
-}
-
-/**
  * Return array of elements value.
  */
 function parser_get_pqelements_values($doc, $selector, $function = 'html', $map = 'trim') {
@@ -1268,11 +1284,13 @@ function _parser_url_allowed($absolute_url, $job) {
     $start_urls = _parser_get_array_from_text_lines($job->start_url);
   }
 
-  if ($job->white_list && !drupal_match_path($absolute_url, $job->white_list)) {
+  if (in_array($absolute_url, $start_urls)) {
+    return TRUE;
+  }
+  if ($job->white_list && !_parser_match_path($absolute_url, $job->white_list)) {
     return FALSE;
   }
-
-  if ($job->black_list && drupal_match_path($absolute_url, $job->black_list)) {
+  if ($job->black_list && _parser_match_path($absolute_url, $job->black_list)) {
     return FALSE;
   }
 
@@ -1336,9 +1354,9 @@ function _parser_url_add($url, $jid, $depth = 0) {
 /**
  * Mark URL as parsed.
  */
-function _parser_url_mark_parsed($url, $jid) {
+function _parser_url_mark_parsed($url, $jid, $status = 1) {
   db_update('parser_urls')
-    ->fields(array('parsed' => 1))
+    ->fields(array('parsed' => $status))
     ->condition('url', $url)
     ->condition('jid', $jid)
     ->execute();
@@ -1401,6 +1419,15 @@ function _parser_download_url_to_cache($url, $headers = array(), $force_download
   $url_md5 = md5($url);
   $cache_dir = 'public://parser_cache/' . drupal_substr($url_md5, 0, 2);
   $cache_uri = $cache_dir . '/' . $url_md5;
+
+  if (!isset($GLOBALS['parser'])) {
+    $GLOBALS['parser']['stat'] = array(
+      'files_from_http_error' => 0,
+      'files_from_http' => 0,
+      'files_from_cache' => 0,
+      'last_error_file' => '',
+    );
+  }
 
   if (!file_exists($cache_uri) || $force_download) {
     if (!empty($GLOBALS['parser']['sleep'])) {
@@ -1539,40 +1566,6 @@ function _parser_set_rows(&$form) {
       _parser_set_rows($form[$element]);
     }
   }
-}
-
-/**
- * Return absolute url by base and relative url (deprecated).
- */
-function _parser_get_full_url($relative_url, $base_url) {
-  $relative_url = trim($relative_url);
-  $relative_url = preg_replace('/#.*/', '', $relative_url);
-  $relative_url_parsed = parse_url($base_url);
-  if (!isset($relative_url_parsed['path'])) {
-    $relative_url_parsed['path'] = '/';
-  }
-
-  // example: //wikimedia.org/dir/image.png
-  if (drupal_substr($relative_url, 0, 2) == '//') {
-    $relative_url = $relative_url_parsed['scheme'] . ':' . $relative_url;
-  }
-  // example: /dir/image.png
-  elseif (drupal_substr($relative_url, 0, 1) == '/') {
-    $relative_url = $relative_url_parsed['scheme'] . '://' . $relative_url_parsed['host'] . $relative_url;
-  }
-  // example: dir/image.png
-  elseif (!preg_match('#^[a-z]+://#', $relative_url)) {
-    $path = preg_replace('#/[^/]+$#', '', $relative_url_parsed['path']);
-    $path = trim($path, '/');
-    if ($path) {
-      $path .= '/';
-    }
-    $relative_url = $relative_url_parsed['scheme'] . '://' . $relative_url_parsed['host'] . '/' . $path . $relative_url;
-  }
-  
-  $relative_url = str_replace(' ', '+', $relative_url);
-  
-  return $relative_url;
 }
 
 /**
@@ -1738,15 +1731,12 @@ function _parser_get_page_links($doc) {
   $links = array();  
   foreach ($doc->find('a') as $a) {
     $href = pq($a)->attr('href');
-    
-    if (!$href) {
-      continue;
-    }
+
     // Continue if $href == '#content'
     if (drupal_substr($href, 0, 1) == '#') {
       continue;
     }
-    // Continue if $href == 'ftp://ftp.drupal.org'
+    // Continue if $href == 'ftp://...'
     if (preg_match('#^([a-z]+)://#', $href, $matches) && !in_array($matches[1], array('http', 'https'))) {
       continue;
     }
@@ -1754,14 +1744,14 @@ function _parser_get_page_links($doc) {
     if (strpos($href, 'javascript:') === 0 || strpos($href, 'mailto:') === 0) {
       continue;
     }
-    
+
     // Remove hash
     $href = preg_replace('/#.*$/', '', $href);
-    
+
     $links[] = $href;
   }
-  
-  return $links;
+
+  return array_unique($links);
 }
 
 /**
@@ -1873,7 +1863,7 @@ function _parser_page_need_force_download($page_url, $job, $element) {
   $force_download = FALSE;
   if ($job->force_download && !$element) {
     if ($job->force_download_list) {
-      $force_download = drupal_match_path($page_url, $job->force_download_list);
+      $force_download = _parser_match_path($page_url, $job->force_download_list);
     }
     else {
       $force_download = TRUE;
@@ -1960,4 +1950,29 @@ function _parser_get_system_message_count() {
     $count += count($messages_by_type);
   }
   return $count;
+}
+
+/**
+ * Advanced version drupal_match_path() with support regular expressions.
+ */
+function _parser_match_path($path, $patterns) {
+  $patterns = _parser_get_array_from_text_lines($patterns);
+
+  foreach ($patterns as $pattern) {
+    if (!trim($pattern)) {
+      continue;
+    }
+    if (drupal_substr($pattern, 0, 1) == '#') {
+      if (preg_match($pattern, $path)) {
+        return TRUE;
+      }
+    }
+    else {
+      if (drupal_match_path($path, $pattern)) {
+        return TRUE;
+      }
+    }
+  }
+
+  return FALSE;
 }

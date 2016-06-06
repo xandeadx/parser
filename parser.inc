@@ -5,7 +5,7 @@
  */
 function parser_job_form($form, &$form_state, $job) {
   $check_button = array('#field_prefix' => '<input type="button" value="проверить" class="form-submit check-button" />');
-  $fields_code = isset($job->fields_code) ? $job->fields_code : array();
+  $fields_code = isset($job->code->fields_code) ? $job->code->fields_code : array();
   $entity_types = entity_get_info();
   $fields_info = field_info_fields();
   $formats = filter_formats();
@@ -124,7 +124,7 @@ function parser_job_form($form, &$form_state, $job) {
       Доступные переменные: $page - html код страницы, $doc - объект phpQuery, $page_url - адрес страницы без учёта редиректов.
       Пример заполнения: <code>return ($doc->find(\'.class-name\')->length() > 0);</code>
     ',
-    '#default_value' => isset($job->check_code) ? $job->check_code : '',
+    '#default_value' => isset($job->code->check_code) ? $job->code->check_code : '',
     '#rows' => 3,
     '#resizable' => FALSE,
   ) + $check_button;
@@ -175,7 +175,7 @@ function parser_job_form($form, &$form_state, $job) {
     '#type' => 'textarea',
     '#title' => 'PHP код',
     '#description' => 'PHP код, который должен вернуть число или строку (не длиннее 255 символов).',
-    '#default_value' => isset($job->remote_id_code) ? $job->remote_id_code : '',
+    '#default_value' => isset($job->code->remote_id_code) ? $job->code->remote_id_code : '',
     '#rows' => 3,
     '#resizable' => FALSE,
   ) + $check_button;
@@ -435,7 +435,7 @@ function _parser_job_form_advanced_settings($job, $check_button) {
     '#type' => 'checkbox',
     '#title' => 'Режим списка',
     '#description' => 'Отметьте, если сущности на сайте источнике не имеют своих страниц, а располагаются в виде списков. Например это могут быть комментарии.',
-    '#default_value' => !empty($job->list_mode_code),
+    '#default_value' => !empty($job->code->list_mode_code),
   );
   
   $form['advanced_settings']['list_mode_code'] = array(
@@ -453,7 +453,7 @@ function _parser_job_form_advanced_settings($job, $check_button) {
         return $elements;
       </code>
     ',
-    '#default_value' => isset($job->list_mode_code) ? $job->list_mode_code : '',
+    '#default_value' => isset($job->code->list_mode_code) ? $job->code->list_mode_code : '',
     '#rows' => 3,
     '#resizable' => FALSE,
     '#states' => array(
@@ -478,7 +478,7 @@ function _parser_job_form_advanced_settings($job, $check_button) {
         }<br />
       </code>
     ',
-    '#default_value' => isset($job->init_code) ? $job->init_code : '',
+    '#default_value' => isset($job->code->init_code) ? $job->code->init_code : '',
     '#rows' => 3,
     '#resizable' => FALSE,
   ) + $check_button;
@@ -494,7 +494,7 @@ function _parser_job_form_advanced_settings($job, $check_button) {
         $doc - объект phpQuery.
       Пример заполнения: <code>$entity->title = \'new title\';</code>
     ',
-    '#default_value' => isset($job->prepare_code) ? $job->prepare_code : '',
+    '#default_value' => isset($job->code->prepare_code) ? $job->code->prepare_code : '',
     '#rows' => 3,
     '#resizable' => FALSE,
   );
@@ -558,9 +558,17 @@ function parser_job_form_fields_ajax_callback($form, $form_state) {
  */
 function parser_job_form_submit(&$form, &$form_state) {
   $clicked_button = $form_state['clicked_button']['#value'];
+  
+  if (!$form_state['values']['parse_limit']) {
+    $form_state['values']['parse_limit'] = 0;
+  }
+  if (!$form_state['values']['run_period']) {
+    $form_state['values']['run_period'] = 0;
+  }
+
+  // Fields code
   $fields = field_info_fields();
   $fields_code = array();
-  
   if (isset($form_state['values']['fields_code'])) {
     foreach ($form_state['values']['fields_code'] as $fieldset) {
       foreach ($fieldset as $field_name => $field_code) {
@@ -570,15 +578,25 @@ function parser_job_form_submit(&$form, &$form_state) {
     $fields_code = array_diff($fields_code, array(''));
   }
   $form_state['values']['fields_code'] = $fields_code;
-  
-  if (!$form_state['values']['parse_limit']) {
-    $form_state['values']['parse_limit'] = 0;
-  }
-  if (!$form_state['values']['run_period']) {
-    $form_state['values']['run_period'] = 0;
-  }
-  
+
   $job = entity_ui_form_submit_build_entity($form, $form_state);
+
+  // Code cols
+  if (!isset($job->code)) {
+    $job->code = (object)array();
+  }
+  $code_cols = array(
+    'check_code',
+    'remote_id_code',
+    'fields_code',
+    'list_mode_code',
+    'init_code',
+    'prepare_code',
+  );
+  foreach ($code_cols as $code_col) {
+    $job->code->{$code_col} = $job->{$code_col};
+  }
+
   $job->save();
 
   // Save
@@ -622,8 +640,8 @@ function parser_run_batch($job, $redirect_to_job = FALSE, $resume = FALSE) {
 
     _parser_url_delete_all($job->jid);
 
-    if ($job->init_code) {
-      eval($job->init_code);
+    if ($job->code->init_code) {
+      eval($job->code->init_code);
     }
 
     $start_urls = _parser_get_array_from_text_lines($job->start_url);
@@ -696,8 +714,8 @@ function parser_parse($job, $redirect_to_job = FALSE, &$context = array()) {
   
   // If list mode enabled
   $elements = NULL;
-  if ($job->list_mode_code) {
-    $elements = eval($job->list_mode_code);
+  if ($job->code->list_mode_code) {
+    $elements = eval($job->code->list_mode_code);
     if ($elements) {
       $elements = array_values($elements); // Re-numbered elements
       $context['sandbox']['element'] = ($context['sandbox']['element'] === NULL) ? 0 : $context['sandbox']['element'] + 1;
@@ -727,12 +745,12 @@ function parser_parse($job, $redirect_to_job = FALSE, &$context = array()) {
   if (is_array($elements) && count($elements) == 0) {
     $allowed_parse = FALSE;
   }
-  if ($allowed_parse && $job->check_code) {
-    $allowed_parse = eval($job->check_code);
+  if ($allowed_parse && $job->code->check_code) {
+    $allowed_parse = eval($job->code->check_code);
   }
   if ($allowed_parse) {
-    if ($job->remote_id_code) {
-      $remote_id = eval($job->remote_id_code);
+    if ($job->code->remote_id_code) {
+      $remote_id = eval($job->code->remote_id_code);
       if ($remote_id) {
         $entity_id = parser_get_entity_id_by_remote_id($remote_id, $job->jid);
       }
@@ -772,7 +790,7 @@ function parser_parse($job, $redirect_to_job = FALSE, &$context = array()) {
     list($entity_properties, $entity_properties_fields) = _parser_get_entity_properties($job->entity_type, $job->bundle);
     
     // Populate properties and fields
-    foreach ($job->fields_code as $property_name => $php_code) {
+    foreach ($job->code->fields_code as $property_name => $php_code) {
       if (!$php_code) {
         continue;
       }
@@ -814,8 +832,8 @@ function parser_parse($job, $redirect_to_job = FALSE, &$context = array()) {
     if (function_exists($function)) {
       $function($entity, $entity_wrapper);
     }
-    if ($job->prepare_code) {
-      eval($job->prepare_code);
+    if ($job->code->prepare_code) {
+      eval($job->code->prepare_code);
     }
     
     // Save entity

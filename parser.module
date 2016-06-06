@@ -92,6 +92,13 @@ function parser_job_load($jid) {
 }
 
 /**
+ * Save parser job.
+ */
+function parser_job_save($job) {
+  return entity_save('parser_job', $job);
+}
+
+/**
  * Parser job uri callback.
  */
 function parser_job_uri($job) {

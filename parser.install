@@ -54,10 +54,6 @@ function parser_schema() {
         'type' => 'text',
         'not null' => TRUE,
       ),
-      'check_code' => array(
-        'type' => 'text',
-        'not null' => TRUE,
-      ),
       'save_url' => array(
         'type' => 'int',
         'size' => 'tiny',
@@ -97,27 +93,6 @@ function parser_schema() {
         'not null' => TRUE,
         'default' => '',
       ),
-      'remote_id_code' => array(
-        'type' => 'text',
-        'not null' => TRUE,
-      ),
-      'fields_code' => array(
-        'type' => 'text',
-        'not null' => TRUE,
-        'serialize' => TRUE,
-      ),
-      'list_mode_code' => array(
-        'type' => 'text',
-        'not null' => TRUE,
-      ),
-      'init_code' => array(
-        'type' => 'text',
-        'not null' => TRUE,
-      ),
-      'prepare_code' => array(
-        'type' => 'text',
-        'not null' => TRUE,
-      ),
       'headers' => array(
         'type' => 'text',
         'not null' => TRUE,
@@ -155,6 +130,11 @@ function parser_schema() {
         'unsigned' => TRUE,
         'not null' => TRUE,
         'default' => 0,
+      ),
+      'code' => array(
+        'type' => 'text',
+        'not null' => TRUE,
+        'serialize' => TRUE,
       ),
       'status' => array(
         'type' => 'int',
@@ -268,39 +248,41 @@ function parser_install() {
       '*.jpg' . "\n" .
       '*.zip' . "\n" .
       '*.tar.gz',
-    'check_code' => 'return $doc->find(\'body\')->hasClass(\'node-type-project-theme\');',
+    'code' => (object)array(
+      'check_code' => 'return $doc->find(\'body\')->hasClass(\'node-type-project-theme\');',
+      'remote_id_code' => '' .
+        '$attr_id = $doc->find(\'.node\')->attr(\'id\');' . "\n" .
+        'list(, $nid) = explode(\'-\', $attr_id);' . "\n" .
+        'return $nid;',
+      'fields_code' => array(
+        'title' => 'return $doc->find(\'h1#page-subtitle\')->text();',
+        'body' => '' .
+          'return array(' . "\n" .
+          '  \'value\' => $doc->find(\'.field-name-body .field-item\')->html(),' . "\n" .
+          '  \'format\' => \'full_html\',' . "\n" .
+          ');',
+        'field_tags' => '' .
+          '$terms = array();' . "\n" .
+          'foreach ($doc->find(\'.project-info a[href^="/taxonomy/term/"]\') as $a) {' . "\n" .
+          '  $terms[] = pq($a)->text();' . "\n" .
+          '}' . "\n" .
+          'return $terms;',
+        'field_image' => '' .
+          'return array(' . "\n" .
+          '  \'file\' => $doc->find(\'.field-name-field-project-images a:first\')->attr(\'href\'),' . "\n" .
+          ');',
+        'author' => 'return 1;',
+      ),
+      'list_mode_code' => '',
+      'init_code' => '',
+      'prepare_code' => '',
+    ),
     'site_charset' => 'auto',
     'charset_fix' => 0,
     'entity_type' => 'node',
     'bundle' => 'article',
     'save_url' => 0,
     'no_update' => 0,
-    'remote_id_code' => '' .
-      '$attr_id = $doc->find(\'.node\')->attr(\'id\');' . "\n" .
-      'list(, $nid) = explode(\'-\', $attr_id);' . "\n" .
-      'return $nid;',
-    'fields_code' => array(
-      'title' => 'return $doc->find(\'h1#page-subtitle\')->text();',
-      'body' => '' .
-        'return array(' . "\n" .
-        '  \'value\' => $doc->find(\'.field-name-body .field-item\')->html(),' . "\n" .
-        '  \'format\' => \'full_html\',' . "\n" .
-        ');',
-      'field_tags' => '' .
-        '$terms = array();' . "\n" .
-        'foreach ($doc->find(\'.project-info a[href^="/taxonomy/term/"]\') as $a) {' . "\n" .
-        '  $terms[] = pq($a)->text();' . "\n" .
-        '}' . "\n" .
-        'return $terms;',
-      'field_image' => '' . 
-        'return array(' . "\n" . 
-        '  \'file\' => $doc->find(\'.field-name-field-project-images a:first\')->attr(\'href\'),' . "\n" .
-        ');',
-      'author' => 'return 1;',
-    ),
-    'list_mode_code' => '',
-    'init_code' => '',
-    'prepare_code' => '',
     'headers' => 'User-Agent: Opera/9.80 (Windows NT 6.1; U; ru) Presto/2.8.131 Version/11.10' . "\n",
     'proxies' => '',
     'force_download' => 0,
@@ -587,5 +569,53 @@ function parser_update_7220() {
     $new_dir = $cache_uri . '/' . drupal_substr($file, 0, 2);
     file_prepare_directory($new_dir, FILE_CREATE_DIRECTORY);
     file_unmanaged_move($cache_uri . '/' . $file, $new_dir . '/' . $file);
+  }
+}
+
+/**
+ * Change {parser_jobs} schema.
+ */
+function parser_update_7221() {
+  module_load_include('inc', 'parser');
+
+  // Add 'code' col
+  db_add_field('parser_jobs', 'code', array(
+    'type' => 'text',
+    'serialize' => TRUE,
+  ));
+  drupal_flush_all_caches();
+  drupal_get_schema(NULL, TRUE);
+  entity_info_cache_clear();
+  entity_flush_caches();
+
+  // Move code cols to single col
+  $code_cols = array(
+    'check_code' => FALSE,
+    'remote_id_code' => FALSE,
+    'fields_code' => TRUE,
+    'list_mode_code' => FALSE,
+    'init_code' => FALSE,
+    'prepare_code' => FALSE,
+  );
+
+  $raw_jobs = db_select('parser_jobs', 'jobs')
+    ->fields('jobs')
+    ->execute()
+    ->fetchAll();
+
+  foreach ($raw_jobs as $job_raw) {
+    $job = parser_job_load($job_raw->jid);
+    $job->code = new stdClass();
+
+    foreach ($code_cols as $col_name => $serialized) {
+      $job->code->{$col_name} = $serialized ? unserialize($job_raw->{$col_name}) : $job_raw->{$col_name};
+    }
+
+    parser_job_save($job);
+  }
+
+  // Delete extra cols
+  foreach (array_keys($code_cols) as $col_name) {
+    db_drop_field('parser_jobs', $col_name);
   }
 }

@@ -249,12 +249,12 @@ function parser_install() {
       '*.zip' . "\n" .
       '*.tar.gz',
     'code' => (object)array(
-      'check_code' => 'return $doc->find(\'body\')->hasClass(\'node-type-project-theme\');',
-      'remote_id_code' => '' .
+      'check' => 'return $doc->find(\'body\')->hasClass(\'node-type-project-theme\');',
+      'remote_id' => '' .
         '$attr_id = $doc->find(\'.node\')->attr(\'id\');' . "\n" .
         'list(, $nid) = explode(\'-\', $attr_id);' . "\n" .
         'return $nid;',
-      'fields_code' => array(
+      'fields' => array(
         'title' => 'return $doc->find(\'h1#page-subtitle\')->text();',
         'body' => '' .
           'return array(' . "\n" .
@@ -273,8 +273,8 @@ function parser_install() {
           ');',
         'author' => 'return 1;',
       ),
-      'list_mode_code' => '',
-      'init_code' => '',
+      'list_mode' => '',
+      'init' => '',
       'prepare_code' => '',
     ),
     'site_charset' => 'auto',
@@ -590,12 +590,12 @@ function parser_update_7221() {
 
   // Move code cols to single col
   $code_cols = array(
-    'check_code' => FALSE,
-    'remote_id_code' => FALSE,
-    'fields_code' => TRUE,
-    'list_mode_code' => FALSE,
-    'init_code' => FALSE,
-    'prepare_code' => FALSE,
+    'check_code'     => array('check', FALSE),
+    'remote_id_code' => array('remote_id', FALSE),
+    'fields_code'    => array('fields', TRUE),
+    'list_mode_code' => array('list', FALSE),
+    'init_code'      => array('init', FALSE),
+    'prepare_code'   => array('prepare', FALSE),
   );
 
   $raw_jobs = db_select('parser_jobs', 'jobs')
@@ -607,8 +607,10 @@ function parser_update_7221() {
     $job = parser_job_load($job_raw->jid);
     $job->code = new stdClass();
 
-    foreach ($code_cols as $col_name => $serialized) {
-      $job->code->{$col_name} = $serialized ? unserialize($job_raw->{$col_name}) : $job_raw->{$col_name};
+    foreach ($code_cols as $col_name => $info) {
+      $new_col_name = $info[0];
+      $serialized = $info[1];
+      $job->code->{$new_col_name} = $serialized ? unserialize($job_raw->{$col_name}) : $job_raw->{$col_name};
     }
 
     parser_job_save($job);

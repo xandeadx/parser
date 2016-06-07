@@ -291,6 +291,7 @@ function parser_install() {
     'options' => (object)array(
       'resume_errors' => FALSE,
       'clear_watchdog' => TRUE,
+      'reparse_entities' => FALSE,
     ),
   ))->save();
 }
@@ -594,7 +595,7 @@ function parser_update_7221() {
   ));
   // Remove 'proxies' col
   db_drop_field('parser_jobs', 'proxies');
-  
+
   drupal_flush_all_caches();
   drupal_get_schema(NULL, TRUE);
   entity_info_cache_clear();
@@ -627,6 +628,7 @@ function parser_update_7221() {
     $job->options = new stdClass();
     $job->options->clear_watchdog = TRUE;
     $job->options->resume_errors = FALSE;
+    $job->options->reparse_entities = FALSE;
 
     parser_job_save($job);
   }

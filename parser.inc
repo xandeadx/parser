@@ -509,9 +509,17 @@ function _parser_job_form_advanced_settings($job, $check_button) {
     '#default_value' => isset($job->headers) ? $job->headers : 'User-Agent: Opera/9.80 (Windows NT 6.1; U; ru) Presto/2.8.131 Version/11.10' . "\n",
   );
 
+  $form['advanced_settings']['reparse_entities'] = array(
+    '#type' => 'checkbox',
+    '#title' => 'Повторно обойти страницы сущностей',
+    '#description' => 'Отметьте, если хотите чтобы парсер занова распарсил страницы, из которых были созданы сущности. Опция "Глубина" в этом режиме принудительно устанавливается в 0.',
+    '#default_value' => isset($job->options->reparse_entities) ? $job->options->reparse_entities : FALSE,
+  );
+
   $form['advanced_settings']['resume_errors'] = array(
     '#type' => 'checkbox',
-    '#title' => 'Повторно обойти ошибочные адреса при продолжении парсинга',
+    '#title' => 'Повторно обойти ошибочные адреса',
+    '#description' => 'Отметьте, если хотите чтобы при продолжении парсинга ошибочные страницы были занова добавлены в очередь.',
     '#default_value' => isset($job->options->resume_errors) ? $job->options->resume_errors : FALSE,
   );
 
@@ -597,6 +605,7 @@ function parser_job_form_submit(&$form, &$form_state) {
   $options_cols = array(
     'resume_errors',
     'clear_watchdog',
+    'reparse_entities',
   );
   foreach ($options_cols as $col_name) {
     $job->options->{$col_name} = $job->{$col_name};
@@ -627,12 +636,12 @@ function parser_run_batch($job, $redirect_to_job = FALSE, $resume = FALSE) {
     $job = parser_job_load($job);
   }
 
-  if (!empty($job->options->clear_watchdog)) {
+  if ($job->options->clear_watchdog) {
     db_delete('watchdog')->execute();
   }
 
   if ($resume) {
-    if (!empty($job->options->resume_errors)) {
+    if ($job->options->resume_errors) {
       db_update('parser_urls')
         ->fields(array('parsed' => 0))
         ->condition('jid', $job->jid)
@@ -649,20 +658,13 @@ function parser_run_batch($job, $redirect_to_job = FALSE, $resume = FALSE) {
       eval($job->code->init);
     }
 
-    $start_urls = _parser_get_array_from_text_lines($job->start_url);
-    foreach ($start_urls as $start_url) {
-      $start_url = trim($start_url);
-      if (preg_match('#\[mask:(\d+),(\d+)\]#', $start_url, $matches)) {
-        $min = (int)$matches[1];
-        $max = (int)$matches[2];
-        for ($i = $min; $i <= $max; $i++) {
-          $url = str_replace('[mask:' . $matches[1] . ',' . $matches[2] . ']', $i, $start_url);
-          _parser_url_add($url, $job->jid);
-        }
-      }
-      else {
-        _parser_url_add($start_url, $job->jid);
-      }
+    // Add parsed entities urls
+    if ($job->options->reparse_entities) {
+      _parser_url_add_parsed_entities($job->jid);
+    }
+    // Add start urls
+    else {
+      _parser_url_add_start($job);
     }
   }
 
@@ -730,7 +732,7 @@ function parser_parse($job, $redirect_to_job = FALSE, &$context = array()) {
   }
   
   // Find links
-  if ($url->depth < $job->depth && !$context['sandbox']['element']) {
+  if ($url->depth < $job->depth && !$context['sandbox']['element'] && !$job->options->reparse_entities) {
     foreach (_parser_get_page_links($doc) as $link_url) {
       $link_url_absolute = parser_get_absolute_url($base_url, $link_url);
       if (_parser_url_allowed($link_url_absolute, $job)) {
@@ -1998,4 +2000,35 @@ function _parser_match_path($path, $patterns) {
   }
 
   return FALSE;
+}
+
+/**
+ * Add start urls to {parser_urls}.
+ */
+function _parser_url_add_start($job) {
+  $start_urls = _parser_get_array_from_text_lines($job->start_url);
+  foreach ($start_urls as $start_url) {
+    $start_url = trim($start_url);
+    if (preg_match('#\[mask:(\d+),(\d+)\]#', $start_url, $matches)) {
+      $min = (int) $matches[1];
+      $max = (int) $matches[2];
+      for ($i = $min; $i <= $max; $i++) {
+        $url = str_replace('[mask:' . $matches[1] . ',' . $matches[2] . ']', $i, $start_url);
+        _parser_url_add($url, $job->jid);
+      }
+    }
+    else {
+      _parser_url_add($start_url, $job->jid);
+    }
+  }
+}
+
+/**
+ * Add parsed entities urls to {parser_urls}.
+ */
+function _parser_url_add_parsed_entities($jid) {
+  db_query("
+    INSERT INTO {parser_urls} (url, jid)
+    SELECT map.url, map.jid FROM {parser_map} map WHERE map.jid = :jid
+  ", array(':jid' => $jid));
 }

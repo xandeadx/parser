@@ -689,15 +689,13 @@ function parser_parse($job, $redirect_to_job = FALSE, &$context = array()) {
   
   if (empty($context['sandbox'])) {
     $context['sandbox']['progress'] = _parser_url_count($job->jid, array(1, 2));
-    $context['sandbox']['entity_ids'] = array();
-    $context['sandbox']['created_entities'] = 0;
     $context['sandbox']['element'] = NULL;
     
     $context['results']['jid'] = $job->jid;
     $context['results']['time_start'] = time();
     $context['results']['created_entities'] = 0;
     $context['results']['updated_entities'] = 0;
-    $context['results']['not_created_entities'] = 0;
+    $context['results']['error_entities'] = 0;
     $context['results']['files_from_http'] = 0;
     $context['results']['files_from_http_error'] = 0;
     $context['results']['files_from_cache'] = 0;
@@ -706,13 +704,14 @@ function parser_parse($job, $redirect_to_job = FALSE, &$context = array()) {
     $context['results']['messages_count'] = _parser_get_watchdog_rows_count();
   }
   
-  $GLOBALS['parser']['stat'] = $context['results'];
+  $GLOBALS['parser']['stat'] = &$context['results'];
   $GLOBALS['parser']['sleep'] = $job->sleep;
   
   $url = _parser_url_get_not_parsed($job->jid);
   $page_url = $GLOBALS['parser']['url'] = $url->url;
+  $page_url_allowed = _parser_url_allowed($page_url, $job);
   $force_download = _parser_page_need_force_download($page_url, $job, $context['sandbox']['element']);
-  $page = _parser_url_allowed($page_url, $job) ? _parser_get_page_by_url($page_url, $job->headers, $job->site_charset, $force_download) : '';
+  $page = $page_url_allowed ? _parser_get_page_by_url($page_url, $job->headers, $job->site_charset, $force_download) : '';
   $doc = _parser_create_phpquery($page, $job->charset_fix);
   $base = $doc->find('base')->attr('href');
   $base_url = $base ? parser_get_absolute_url($page_url, $base) : $page_url;
@@ -746,7 +745,7 @@ function parser_parse($job, $redirect_to_job = FALSE, &$context = array()) {
   if (!$page) {
     $allowed_parse = FALSE;
   }
-  if ($allowed_parse && $job->parse_limit && $context['sandbox']['created_entities'] >= $job->parse_limit) {
+  if ($allowed_parse && $job->parse_limit && $context['results']['created_entities'] >= $job->parse_limit) {
     $allowed_parse = FALSE;
   }
   if (is_array($elements) && count($elements) == 0) {
@@ -765,10 +764,6 @@ function parser_parse($job, $redirect_to_job = FALSE, &$context = array()) {
     if (!isset($entity_id)) {
       $entity_id = parser_get_entity_id_by_url($page_url, $job->jid, $context['sandbox']['element']);
     }
-    
-    if ($entity_id && in_array($entity_id, $context['sandbox']['entity_ids'])) {
-      $allowed_parse = FALSE;
-    }
   }
   if ($allowed_parse && $job->no_update && $entity_id) {
     $allowed_parse = FALSE;
@@ -782,13 +777,11 @@ function parser_parse($job, $redirect_to_job = FALSE, &$context = array()) {
     // Load entity
     if ($entity_id) {
       $entity = entity_load_single($job->entity_type, $entity_id);
-      $GLOBALS['parser']['stat']['updated_entities']++;
     }
     // Create entity object
     if (!isset($entity)) {
       $entity_info = entity_get_info($job->entity_type);
       $entity = entity_create($job->entity_type, array($entity_info['entity keys']['bundle'] => $job->bundle));
-      $GLOBALS['parser']['stat']['created_entities']++;
     }
     
     $entity_wrapper = entity_metadata_wrapper($job->entity_type, $entity);
@@ -846,10 +839,17 @@ function parser_parse($job, $redirect_to_job = FALSE, &$context = array()) {
     // Save entity
     try {
       $entity_wrapper->save();
+
+      if ($entity_id) {
+        $context['results']['updated_entities']++;
+      }
+      else {
+        $context['results']['created_entities']++;
+      }
     }
     catch (Exception $e) {
       _parser_watchdog('Ошибка при сохранении сущности: ' . $e->getMessage() . '. <b>Адрес:</b> ' . check_plain($page_url), $entity, WATCHDOG_ERROR);
-      $context['results']['not_created_entities']++;
+      $context['results']['error_entities']++;
       $entity_save_error = TRUE;
     }
     
@@ -861,9 +861,6 @@ function parser_parse($job, $redirect_to_job = FALSE, &$context = array()) {
         'remote_id' => isset($remote_id) ? $remote_id : '',
         'element' => $context['sandbox']['element'],
       ));
-      
-      $context['sandbox']['entity_ids'][] = $entity_id;
-      $context['sandbox']['created_entities']++;
     }
   }
   
@@ -875,11 +872,10 @@ function parser_parse($job, $redirect_to_job = FALSE, &$context = array()) {
   }
 
   $context['sandbox']['max'] = _parser_url_count($job->jid);
-  $context['results'] = $GLOBALS['parser']['stat'];
-  
+
   // Statistics
   $new_watchdog_row_count = _parser_get_watchdog_rows_count() - $context['results']['messages_count'];
-  $last_error_file = $context['results']['files_from_http_error'] ? ' (последний: ' . check_plain($GLOBALS['parser']['stat']['last_error_file']) . ')' : '';
+  $last_error_file = $context['results']['files_from_http_error'] ? ' (последний: ' . check_plain($context['results']['last_error_file']) . ')' : '';
   $queue_pages = $context['sandbox']['max'] - $context['sandbox']['progress'];
   $elapsed_time = time() - $context['results']['time_start'];
   $left_time = $context['sandbox']['progress'] ? ($queue_pages / $context['sandbox']['progress']) * $elapsed_time : 0;
@@ -889,7 +885,7 @@ function parser_parse($job, $redirect_to_job = FALSE, &$context = array()) {
     'Страниц в очереди'                      => $queue_pages,
     'Создано сущностей'                      => $context['results']['created_entities'],
     'Обновлено сущностей'                    => $context['results']['updated_entities'],
-    'Не удалось создать/сохранить сущностей' => $context['results']['not_created_entities'],
+    'Не удалось создать/сохранить сущностей' => $context['results']['error_entities'],
     'Скачано url'                            => $context['results']['files_from_http'],
     'Не удалось скачать url'                 => $context['results']['files_from_http_error'] . $last_error_file,
     'URL взято из кэша'                      => $context['results']['files_from_cache'],
@@ -909,7 +905,7 @@ function parser_parse($job, $redirect_to_job = FALSE, &$context = array()) {
   $context['message'] .= '<br />' . l('Остановить парсинг', 'admin/structure/parser_jobs/manage/' . $job->jid);
 
   // Calculate progress
-  if ($job->parse_limit && $context['sandbox']['created_entities'] >= $job->parse_limit) {
+  if ($job->parse_limit && $context['results']['created_entities'] >= $job->parse_limit) {
     $context['finished'] = 1;
   }
   elseif ($context['sandbox']['progress'] <= $context['sandbox']['max']) {
@@ -929,7 +925,7 @@ function parser_finished($success, $results, $operations) {
     Не удалось скачать URL: ' . $results['files_from_http_error'] . '<br />
     Создано сущностей: ' . l($results['created_entities'], 'admin/structure/parser_jobs/results/' . $results['jid']) . '<br />
     Обновлено сущностей: ' . l($results['updated_entities'], 'admin/structure/parser_jobs/results/' . $results['jid']) . '<br />
-    Не удалось создать/сохранить сущностей: ' . $results['not_created_entities'] . '<br />
+    Не удалось создать/сохранить сущностей: ' . $results['error_entities'] . '<br />
     Затрачено времени: ' . gmdate('H:i:s', time() - $results['time_start']) . '<br />
     Новых сообщений в системном журнале: ' . l(_parser_get_watchdog_rows_count() - $results['messages_count'], 'admin/reports/dblog') . '<br />
   ';
@@ -945,7 +941,7 @@ function parser_finished($success, $results, $operations) {
  * Menu callback. Check php code.
  */
 function parser_check_code() {
-  $params = array('test_url', 'site_charset', 'charset_fix', 'field_name', 'field_value', 'list_mode_code', 'headers');
+  $params = array('test_url', 'site_charset', 'charset_fix', 'field_name', 'field_value', 'list_code', 'headers');
   foreach ($params as $param) {
     if (!isset($_POST[$param])) {
       echo 'bad params';
@@ -964,8 +960,8 @@ function parser_check_code() {
   $page_url = $_POST['test_url'];
   $doc = _parser_create_phpquery($page, $_POST['charset_fix']);
   
-  if ($_POST['list_mode_code']) {
-    $elements = eval($_POST['list_mode_code']);
+  if ($_POST['list_code']) {
+    $elements = eval($_POST['list_code']);
     $element_html = current($elements);
     $doc_element = _parser_create_phpquery($element_html, $_POST['charset_fix']);
   }
@@ -1310,6 +1306,9 @@ function _parser_url_allowed($absolute_url, $job) {
   }
 
   if (in_array($absolute_url, $start_urls)) {
+    return TRUE;
+  }
+  if ($job->options->reparse_entities) {
     return TRUE;
   }
   if ($job->white_list && !_parser_match_path($absolute_url, $job->white_list)) {

@@ -97,10 +97,6 @@ function parser_schema() {
         'type' => 'text',
         'not null' => TRUE,
       ),
-      'proxies' => array(
-        'type' => 'text',
-        'not null' => TRUE,
-      ),
       'force_download' => array(
         'type' => 'int',
         'size' => 'tiny',
@@ -132,6 +128,11 @@ function parser_schema() {
         'default' => 0,
       ),
       'code' => array(
+        'type' => 'text',
+        'not null' => TRUE,
+        'serialize' => TRUE,
+      ),
+      'options' => array(
         'type' => 'text',
         'not null' => TRUE,
         'serialize' => TRUE,
@@ -284,10 +285,13 @@ function parser_install() {
     'save_url' => 0,
     'no_update' => 0,
     'headers' => 'User-Agent: Opera/9.80 (Windows NT 6.1; U; ru) Presto/2.8.131 Version/11.10' . "\n",
-    'proxies' => '',
     'force_download' => 0,
     'force_download_list' => '',
     'sleep' => 0,
+    'options' => (object)array(
+      'resume_errors' => FALSE,
+      'clear_watchdog' => TRUE,
+    ),
   ))->save();
 }
 
@@ -583,12 +587,19 @@ function parser_update_7221() {
     'type' => 'text',
     'serialize' => TRUE,
   ));
+  // Add 'options' col
+  db_add_field('parser_jobs', 'options', array(
+    'type' => 'text',
+    'serialize' => TRUE,
+  ));
+  // Remove 'proxies' col
+  db_drop_field('parser_jobs', 'proxies');
+  
   drupal_flush_all_caches();
   drupal_get_schema(NULL, TRUE);
   entity_info_cache_clear();
   entity_flush_caches();
 
-  // Move code cols to single col
   $code_cols = array(
     'check_code'     => array('check', FALSE),
     'remote_id_code' => array('remote_id', FALSE),
@@ -605,13 +616,17 @@ function parser_update_7221() {
 
   foreach ($raw_jobs as $job_raw) {
     $job = parser_job_load($job_raw->jid);
-    $job->code = new stdClass();
 
+    $job->code = new stdClass();
     foreach ($code_cols as $col_name => $info) {
       $new_col_name = $info[0];
       $serialized = $info[1];
       $job->code->{$new_col_name} = $serialized ? unserialize($job_raw->{$col_name}) : $job_raw->{$col_name};
     }
+
+    $job->options = new stdClass();
+    $job->options->clear_watchdog = TRUE;
+    $job->options->resume_errors = FALSE;
 
     parser_job_save($job);
   }

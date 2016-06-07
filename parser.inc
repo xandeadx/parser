@@ -508,25 +508,18 @@ function _parser_job_form_advanced_settings($job, $check_button) {
     ',
     '#default_value' => isset($job->headers) ? $job->headers : 'User-Agent: Opera/9.80 (Windows NT 6.1; U; ru) Presto/2.8.131 Version/11.10' . "\n",
   );
-  
-  $form['advanced_settings']['proxies'] = array(
-    '#type' => 'value',
-    '#title' => 'Прокси',
-    '#description' => '',
-    '#value' => '',
-  );
 
   $form['advanced_settings']['resume_errors'] = array(
     '#type' => 'checkbox',
-    '#title' => 'Повторно обойти ошибочные адреса',
-    '#default_value' => FALSE,
+    '#title' => 'Повторно обойти ошибочные адреса при продолжении парсинга',
+    '#default_value' => isset($job->options->resume_errors) ? $job->options->resume_errors : FALSE,
   );
 
   $form['advanced_settings']['clear_watchdog'] = array(
     '#type' => 'checkbox',
     '#title' => 'Очистить системный журнал',
     '#description' => 'Отметьте, если хотите очистить системный журнал (watchdog) перед началом парсинга.',
-    '#default_value' => module_exists('dblog'),
+    '#default_value' => isset($job->options->clear_watchdog) && module_exists('dblog') ? $job->options->clear_watchdog : FALSE,
     '#disabled' => !module_exists('dblog'),
   );
   
@@ -593,8 +586,20 @@ function parser_job_form_submit(&$form, &$form_state) {
     'init',
     'prepare',
   );
-  foreach ($code_cols as $code_col) {
-    $job->code->{$code_col} = $job->{$code_col . '_code'};
+  foreach ($code_cols as $col_name) {
+    $job->code->{$col_name} = $job->{$col_name . '_code'};
+  }
+
+  // Options
+  if (!isset($job->options)) {
+    $job->options = (object)array();
+  }
+  $options_cols = array(
+    'resume_errors',
+    'clear_watchdog',
+  );
+  foreach ($options_cols as $col_name) {
+    $job->options->{$col_name} = $job->{$col_name};
   }
 
   $job->save();
@@ -622,12 +627,12 @@ function parser_run_batch($job, $redirect_to_job = FALSE, $resume = FALSE) {
     $job = parser_job_load($job);
   }
 
-  if (!empty($job->clear_watchdog)) {
+  if (!empty($job->options->clear_watchdog)) {
     db_delete('watchdog')->execute();
   }
 
   if ($resume) {
-    if (!empty($job->resume_errors)) {
+    if (!empty($job->options->resume_errors)) {
       db_update('parser_urls')
         ->fields(array('parsed' => 0))
         ->condition('jid', $job->jid)

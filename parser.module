@@ -59,7 +59,7 @@ function parser_entity_info() {
     'parser_job' => array(
       'label' => t('Job parsing'),
       'entity class' => 'Entity',
-      'controller class' => 'EntityAPIController',
+      'controller class' => 'EntityAPIControllerExportable',
       'base table' => 'parser_jobs',
       'entity keys' => array(
         'id' => 'jid',
@@ -225,5 +225,14 @@ function parser_cron() {
       entity_save('parser_job', $job);
       parser_run_in_background($jid);
     }
+  }
+}
+
+/**
+ * Implements hook_entity_presave().
+ */
+function parser_entity_presave($entity, $type) {
+  if ($type == 'parser_job' && !empty($entity->code) && is_array($entity->code)) {
+    $entity->code = (object)$entity->code;
   }
 }

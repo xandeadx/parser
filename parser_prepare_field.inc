@@ -119,7 +119,7 @@ function _parser_prepare_field_file(&$result, $field_info, $field_instance, $ent
   if (is_string($result)) {
     $result = array('file' => $result);
   }
-  if (!$result['file']) {
+  if (!isset($result['file']) || !$result['file']) {
     $result = NULL;
     return;
   }
